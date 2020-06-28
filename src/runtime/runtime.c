@@ -85,12 +85,9 @@ static int dispatch_seq(kernel_data* d,
 int cpt_dispatch_kernel(void* v,
     kernel_data d,
     int numx, int numy, int numz) {
-    printf("v %p\n", v);
     cpt_kernel* k = (cpt_kernel*)(v);
 
-    printf("in dispatch\n");
     if (k->num_threads == 1) {
-    printf("in if\n");
         return dispatch_seq(&d, numx, numy, numz);
     }
 

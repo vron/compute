@@ -9,9 +9,10 @@ shaders may fail in unexpected on unseen ways.
 
 # Get started
 Due to the complicated dependices the tool is easiest to use through docker. Put
-your compute shader (e.g. kernel.comp) in a folder and inside that folder issue:
+your compute shader (e.g. kernel.comp) in a folder named "data" and from its
+parent folder issue:
 
-    docker run vron/compute kernel.comp
+    docker run -v $(pwd)/data:/data vron/compute
 
 If your shader is supported it should create the following files for you:
 

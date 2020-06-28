@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // this file implements the logic to create the go package file
@@ -41,7 +42,7 @@ type Data struct {
 
 	for _, arg := range info.CallArgs {
 		// TOOD: Add comments detailing from where this argument came in the original kernel.
-		buf.WriteString("\t" + arg.Name + " " + arg.Type.Go + "\n")
+		buf.WriteString("\t" + strings.Title(arg.Name) + " " + arg.Type.Go + "\n")
 	}
 	buf.WriteString(`}
 
@@ -72,8 +73,8 @@ func (k *kernel) Dispatch(bind Data, numx, numy, numz int) error {
 		panic("cannot use a kernel where Free() has been called")
 	}
 	cbind := C.kernel_data{
-		imgData: (*C.float)(bind.imgData),
-		imgWidth: (C.uint)(bind.imgWidth),
+		imgData: (*C.float)(bind.ImgData),
+		imgWidth: (C.uint)(bind.ImgWidth),
 	}
 	errno := C.cpt_dispatch_kernel(k.k, cbind, C.int(numx), C.int(numy), C.int(numz))
 	`)

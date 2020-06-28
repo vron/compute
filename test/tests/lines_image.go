@@ -43,8 +43,8 @@ func TestShader(t *testing.T) {
 	nop := 2
 	img := make([]float32, nop*nop*8*8*4)
 	d := Data{
-		imgData:  &(img[0]),
-		imgWidth: uint(nop * 8),
+		ImgData:  &(img[0]),
+		ImgWidth: uint(nop * 8),
 	}
 
 	run(t, 1, d, nop, nop, 1)
