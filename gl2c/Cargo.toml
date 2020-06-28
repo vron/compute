@@ -1,0 +1,12 @@
+[package]
+name = "gl2c"
+version = "0.1.0"
+license = "MIT"
+authors = ["V Ogeman and glsl authors"]
+edition = "2018"
+
+[dependencies]
+glsl = "4.0"
+serde = "0.9"
+serde_json = "0.9"
+serde_derive = "0.9"

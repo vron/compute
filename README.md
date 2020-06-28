@@ -25,6 +25,9 @@ That you should be able to use directly as a go package.
 For an example of using compute to generate a package, including how to call it
 please see github.com/vron/computeexample
 
+# Alignment
+Effectively std430 BUT vec3 and friends are rounded up to vec4 to allow for aligned sse2 operations.
+
 # Testing
 Testing is slow since it uses the full pipeling through the docker image for each
 test case. To run all test cases run:
@@ -36,12 +39,16 @@ test case. To run all test cases run:
  - Currently one thread only
  - Currently no synchronization primitives
  - Currently a very limited subset of GLSL is supported.
+ - Do not support arrays of structs with arrays as children in input
 
 # Architecture
 TODO: Write once I have commited to a design
 
 
 # TODO
- - Ensure e.g. int sizes match when on 32 bit platform - likely not (opencl - platform that is)
- - Ensure struct alignments similarity between go and c - likely a problem? (or does cgo handle)
- - support multi-file shader
+ - Do not include builin types not in use...
+ - benchmar suit
+ - support multi-file shader with macros
+ - Gain more performance but letting the compiler now we have ensured all the alignements
+ - Document that all fields not of slices will be COPIED to not mess with cgo ( i.e  vec4[1000] is a bad idea perforamnce wise..)
+ - idally we should be able to upload a *float as []float32?
