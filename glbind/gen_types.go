@@ -226,10 +226,13 @@ func genPossibleSizes(all *[][]aopt, current *[]aopt, target int, options []aopt
 }
 
 func generateBuiltinFunctions(buf *bufio.Writer) {
-	fimageStore(buf)
+	//buf.WriteString("void barrier();\n")
+
+	fimageStoreLoad(buf)
+	fAtomic(buf)
 }
 
-func fimageStore(buf *bufio.Writer) {
+func fimageStoreLoad(buf *bufio.Writer) {
 	// TODO: generate for types of images, also for non-2D images
 	buf.WriteString(`void imageStore(image2Drgba32f image, ivec2 P, vec4 data) {
 	int32_t index = 4*P.x+4*P.y*image.width;
@@ -238,7 +241,53 @@ func fimageStore(buf *bufio.Writer) {
 	image.data[index + 2] = data.z;
 	image.data[index + 3] = data.w;
 }
+
 `)
+	buf.WriteString(`vec4 imageLoad(image2Drgba32f image, ivec2 P) {
+	int32_t index = 4*P.x+4*P.y*image.width;
+	return make_vec4(image.data[index + 0], image.data[index + 1], image.data[index + 2], image.data[index + 3]);
+}
+
+`)
+}
+func fAtomic(buf *bufio.Writer) {
+	for _, t := range []string{"uint32_t", "int32_t"} {
+		fmt.Fprintf(buf, "%v INL atomicAdd(%v *mem, %v data) {\n", t, t, t)
+		fmt.Fprintf(buf, "\treturn __atomic_add_fetch(mem, data, __ATOMIC_SEQ_CST);\n")
+		fmt.Fprintf(buf, "}\n\n")
+
+		fmt.Fprintf(buf, "%v INL atomicAnd(%v *mem, %v data) {\n", t, t, t)
+		fmt.Fprintf(buf, "\treturn __atomic_and_fetch(mem, data, __ATOMIC_SEQ_CST);\n")
+		fmt.Fprintf(buf, "}\n\n")
+
+		fmt.Fprintf(buf, "%v INL atomicOr(%v *mem, %v data) {\n", t, t, t)
+		fmt.Fprintf(buf, "\treturn __atomic_or_fetch(mem, data, __ATOMIC_SEQ_CST);\n")
+		fmt.Fprintf(buf, "}\n\n")
+
+		fmt.Fprintf(buf, "%v INL atomicXor(%v *mem, %v data) {\n", t, t, t)
+		fmt.Fprintf(buf, "\treturn __atomic_xor_fetch(mem, data, __ATOMIC_SEQ_CST);\n")
+		fmt.Fprintf(buf, "}\n\n")
+
+		fmt.Fprintf(buf, "%v INL atomicMin(%v *mem, %v data) {\n", t, t, t)
+		fmt.Fprintf(buf, "\treturn __atomic_fetch_min(mem, data, __ATOMIC_SEQ_CST);\n")
+		fmt.Fprintf(buf, "}\n\n")
+
+		fmt.Fprintf(buf, "%v INL atomicMax(%v *mem, %v data) {\n", t, t, t)
+		fmt.Fprintf(buf, "\treturn __atomic_fetch_max(mem, data, __ATOMIC_SEQ_CST);\n")
+		fmt.Fprintf(buf, "}\n\n")
+
+		fmt.Fprintf(buf, "%v INL atomicExchange(%v *mem, %v data) {\n", t, t, t)
+		fmt.Fprintf(buf, "\treturn __atomic_exchange_n(mem, data, __ATOMIC_SEQ_CST);\n")
+		fmt.Fprintf(buf, "}\n\n")
+
+		// TODO: Is this one really correct?!
+		fmt.Fprintf(buf, "%v INL atomicCompSwap(%v *mem, %v compare, %v data) {\n", t, t, t, t)
+		fmt.Fprintf(buf, "\t__atomic_compare_exchange_n(mem, &compare, data, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);\n")
+		fmt.Fprintf(buf, "\treturn compare;\n")
+		fmt.Fprintf(buf, "}\n\n")
+
+	}
+
 }
 
 func generateUserStructs(buf *bufio.Writer, inp Input) {

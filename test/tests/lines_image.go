@@ -14,8 +14,7 @@ layout(rgba32f, binding = 0) uniform image2D img;
 
 void main() {
   vec4 pixel = vec4(0.0f, 0.0f, 0.0f, 1.0f);
-  ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy)*8;
-  pixel_coords += ivec2(gl_LocalInvocationID.xy);
+  ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
   if(pixel_coords.x%2 == 0) {
     pixel = vec4(1.0f, 1.0f, 1.0f, 1.0f);
   } 

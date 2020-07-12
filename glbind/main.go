@@ -15,6 +15,7 @@ var (
 
 type Input struct {
 	Arguments []InputArgument
+	Shared    []InputArgument
 	Structs   []InputStruct
 	Wg_size   [3]int
 	Body      string
@@ -48,6 +49,14 @@ func main() {
 	expect(json.Unmarshal(b, &inp))
 
 	parseTypeInfo(inp)
+
+	for _, s := range inp.Shared {
+		if len(s.Arrno) == 0 {
+			// This is since we need to access it shared - maybe we can replace it by using
+			// c++ references instead of pointers and thusly achieve what we want?
+			panic("thus far we only support shared arrays")
+		}
+	}
 
 	generateSharedH(inp)
 	generateTypes(inp)

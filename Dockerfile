@@ -2,11 +2,11 @@ FROM ubuntu:focal
 # TODO: update to clang 11
 RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get update && \
-    apt-get install -y build-essential glslang-tools clang golang-go cargo rustc
+    apt-get install -y build-essential glslang-tools clang golang-go cargo rustc git
 
 #RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 #RUN echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
-
+RUN go get golang.org/x/tools/cmd/goimports && cp /root/go/bin/goimports /bin/
 RUN mkdir /data
 
 COPY gl2c gl2c

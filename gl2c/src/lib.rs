@@ -27,6 +27,7 @@ pub struct Struct {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Export {
     arguments: Vec<Argument>,
+    shared: Vec<Argument>,
     structs: Vec<Struct>,
     wg_size: [i32; 3],
     body: String,
@@ -50,6 +51,7 @@ impl fmt::Display for Argument {
 pub struct State {
     body: Part,
     arguments: Vec<Argument>,
+    shared: Vec<Argument>,
     structs: Vec<Struct>,
     wg_size: [i32; 3],
 
@@ -83,12 +85,16 @@ impl State {
     pub fn add_arg(&mut self, arg: Argument) {
         self.arguments.push(arg.clone());
     }
+    pub fn add_shared(&mut self, arg: Argument) {
+        self.shared.push(arg.clone());
+    }
 
     pub fn write_json(mut self) -> String {
         let mut s = String::new();
         s.write_str(&self.body.as_str()[..]).expect("");
         let out = Export {
             arguments: self.arguments.iter().map(|b| b.clone()).collect(),
+            shared: self.shared.iter().map(|b| b.clone()).collect(),
             structs: self.structs,
             wg_size: self.wg_size,
             body: s,
@@ -518,10 +524,6 @@ pub fn visit_layout_qualifier(s: &mut State, l: &syntax::LayoutQualifier) {
 
     let _ = write!(s, "{}", "layout (");
     let _ = visit_layout_qualifier_spec(s, first);
-    /*if firstprop != "std430" && firstprop != "local_size_x"{
-        println!("{}", firstprop);
-        panic!("all layouts must start with std430 (or local_size_x)");
-    }*/
 
     for qual_spec in qualifiers {
         let _ = write!(s, "{}", ", ");
@@ -563,17 +565,6 @@ pub fn maybe_handle_wg(state: &mut State, q: &syntax::TypeQualifier) -> Option<i
 }
 
 pub fn maybe_handle_global_buffer(state: &mut State, l: &syntax::InitDeclaratorList) -> Option<()> {
-    /*  let mut qualifiers = q.qualifiers.0.iter();
-    let l = match qualifiers.next().unwrap() {
-      syntax::TypeQualifierSpec::Layout(ref l) => l,
-      _ => return None
-    };
-
-    // chec if
-    None
-
-    */
-
     let d = &l.head;
 
     let mut subtype = String::from("");
@@ -628,6 +619,62 @@ pub fn maybe_handle_global_buffer(state: &mut State, l: &syntax::InitDeclaratorL
             name: String::from(name.as_str()),
             ty: typname,
             arrno: vec!(),
+        });
+        return Some(())
+    }
+
+    None
+
+}
+
+pub fn maybe_handle_shared(state: &mut State, l: &syntax::InitDeclaratorList) -> Option<()> {
+    let d = &l.head;
+
+
+    let subtype = String::from("");
+
+    // chec if this is a layout statement, and if so find the first qualifier in that
+    if let Some(q) = &d.ty.qualifier {
+        let mut qualifiers = q.qualifiers.0.iter();
+        let first = qualifiers.next().unwrap();
+        let s= match first {
+            syntax::TypeQualifierSpec::Storage(ref s) => s,
+            _ => return None,
+        };
+    
+        match s {
+            syntax::StorageQualifier::Shared => (),
+            _ => return None,
+        }
+
+    } else {
+        return None;
+    }
+
+    let mut typname = type_specifier_non_array(state, &d.ty.ty.ty);
+
+    // if this has a tail we should not handle it
+    for _decl in &l.tail {
+        return None;
+    }
+
+    // if there is any array part add that
+    let mut arrno = vec!();
+    if let Some(a) = &l.head.array_specifier {
+        let len = visit_array_spec(state, &a);
+        match len {
+            Some(l) => {
+                arrno.push(l);
+            },
+            _ => {},
+        };
+    }
+    if let Some(ref name) = d.name {    // Add this argument
+        typname.push_str(&subtype[..]);
+        state.add_shared(Argument{
+            name: String::from(name.as_str()),
+            ty: typname,
+            arrno: arrno,
         });
         return Some(())
     }
@@ -775,6 +822,7 @@ pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Option<i32> {
                         "bvec2" => write!(s, "{}", "make_bvec2"),
                         "bvec3" => write!(s, "{}", "make_bvec3"),
                         "bvec4" => write!(s, "{}", "make_bvec4"),
+                        "barrier" => write!(s, "{}", "this->barrier"),
                         _ =>  write!(s, "{}", n.0),
                     };
                 },
@@ -786,10 +834,33 @@ pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Option<i32> {
 
             let _ = write!(s, "{}", "(");
 
+            let is_atomic = match fun {
+                syntax::FunIdentifier::Identifier(ref n) => {
+                    match &n.0[..] {
+                        "atomicAdd" => true,
+                        "atomicMin" => true,
+                        "atomicMax" => true,
+                        "atomicAnd" => true,
+                        "atomicOr" => true,
+                        "atomicXor" => true,
+                        "atomicExchange" => true,
+                        "atomicCompSwap" => true,
+                        _ => false,
+                    }
+                },
+                _ =>  false,
+            };
+
             if !args.is_empty() {
                 let mut args_iter = args.iter();
                 let first = args_iter.next().unwrap();
-                visit_expr(s, first);
+                if is_atomic {
+                    let _ = write!(s, "{}", "&(");
+                    visit_expr(s, first);
+                    let _ = write!(s, "{}", ")");
+                } else {
+                    visit_expr(s, first);
+                }
 
                 for e in args_iter {
                     let _ = write!(s, "{}", ", ");
@@ -986,6 +1057,17 @@ pub fn visit_declaration(s: &mut State, d: &syntax::Declaration, global: bool) {
             }
             s.pop_output();
 
+            // Handle declarations of shared varaibles that we need to parse out
+            s.push_output(Output::None);
+            match maybe_handle_shared(s, &list) {
+                Some(..) => {
+                    s.pop_output();
+                    return
+                },
+                _ => (),
+            }
+            s.pop_output();
+
             //s.push_output(Output::None);
 
             if global {
@@ -993,7 +1075,7 @@ pub fn visit_declaration(s: &mut State, d: &syntax::Declaration, global: bool) {
             }
             visit_init_declarator_list(s, &list);
             if global{
-                s.pop_output();
+               s.pop_output();
             }
             let _ = write!(s, "{}", ";\n");
             //s.pop_output();
@@ -1468,6 +1550,7 @@ pub fn translate(file: String) -> String {
     let mut state = State {
         body: Part::new(),
         arguments: Vec::new(),
+        shared: Vec::new(),
         structs: Vec::new(),
         output: Output::Body,
         last_output: Vec::new(),
