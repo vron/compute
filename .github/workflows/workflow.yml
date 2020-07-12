@@ -1,0 +1,23 @@
+on: [push, pull_request]
+name: Test
+jobs:
+  test:
+    name: Test code
+    strategy:
+      matrix:
+        platform: [ubuntu-20.04]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Install required packages
+        run : sudo apt-get update && sudo apt-get install build-essential glslang-tools clang cargo rustc git
+        if: runner.os == 'Linux'
+
+      - name: Install goimports
+        run : go get golang.org/x/tools/cmd/goimports && sudo cp ~/go/bin/goimports /usr/bin && sudo chmod 777 /usr/bin/goimports
+        if: runner.os == 'Linux'
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+        
+      - name: run the test-suit
+        run: go run test/main.go -local

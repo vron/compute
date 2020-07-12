@@ -26,8 +26,7 @@ void main() {
         }
     }
 
-    // memoryBarrierShared();  // stripes
-    // barrier();              // works
+    barrier();
 
     imageStore(outImage, my_index, shared_data[gl_LocalInvocationID.x]);
 }
