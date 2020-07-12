@@ -7,7 +7,7 @@ struct thread_data {
 
 void *thread_core(void *ptr) {
   struct thread_data *td = (struct thread_data *)(ptr);
-  log("starting thread %p", td);
+  d_log("starting thread %p", td);
 
   td->kernel->thread = td;
   td->kernel->main();
@@ -15,9 +15,9 @@ void *thread_core(void *ptr) {
 }
 
 void kernel_comp::barrier() {
-  trace("barrier call %p", this);
+  d_trace("barrier call %p", this);
   pthread_barrier_wait(this->thread->barrier);
-  trace("barrier release %p", this);
+  d_trace("barrier release %p", this);
 }
 
 struct kernel {
@@ -53,7 +53,7 @@ struct kernel {
 
           int ercc = pthread_barrier_init(
               &barrier, NULL, _cpt_WG_SIZE_Z * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X);
-          log("init %d %p", ercc, &barrier);
+          d_log("init %d %p", ercc, &barrier);
           if(ercc)
             return ercc + 150;
 
@@ -65,7 +65,7 @@ struct kernel {
               for (uint32_t lx = 0; lx < _cpt_WG_SIZE_X; ++lx) {
                 long index = lx + ly * _cpt_WG_SIZE_X +
                              lz * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X;
-                verbose("in loop %d %ld",
+                d_verbose("in loop %d %ld",
                         _cpt_WG_SIZE_Z * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X,
                         index);
                 kernel_comp *k = new kernel_comp(); // TODO: re-use the
@@ -97,10 +97,10 @@ struct kernel {
 
                 // for each one, create a thread that we will use:
                 int errno;
-                verbose("about to creae");
+                d_verbose("about to creae");
                 errno = pthread_create(&threads[index].thread, NULL, thread_core,
                                        (void *)&threads[index]);
-                verbose("thread create no %d", errno);
+                d_verbose("thread create no %d", errno);
                 if (errno)
                   return errno; // TODO: memory leas... (this entire functin...)
                   
@@ -115,7 +115,7 @@ struct kernel {
                 long index = lx + ly * _cpt_WG_SIZE_X +
                              lz * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X;
                 int s = pthread_join(threads[index].thread, NULL);
-                log("ERC %d", s);
+                d_log("ERC %d", s);
                 if (s != 0)
                   return s +1000;
                   //return error("error joining threads: %d", s);

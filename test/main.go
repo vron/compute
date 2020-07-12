@@ -16,12 +16,14 @@ import (
 
 var (
 	fLocal    bool
+	fBench    bool
 	once      sync.Once
 	imageName string
 )
 
 func init() {
-	flag.BoolVar(&fLocal, "local", false, "run on local machine instead of container")
+	flag.BoolVar(&fLocal, "local", true, "run on local machine instead of container")
+	flag.BoolVar(&fBench, "bench", false, "run benchmars instead of tests")
 	log.SetFlags(log.LstdFlags | log.Llongfile)
 }
 
@@ -39,7 +41,17 @@ func main() {
 
 	testFiles, err := filepath.Glob("./test/tests/*.go")
 	ensure(err)
-	for _, testFile := range testFiles {
+	benchFiles, err := filepath.Glob("./test/benchmarks/*.go")
+	ensure(err)
+	if !fBench {
+		for _, testFile := range testFiles {
+			if !re.MatchString(testFile) {
+				continue
+			}
+			runTest(testFile)
+		}
+	}
+	for _, testFile := range benchFiles {
 		if !re.MatchString(testFile) {
 			continue
 		}
@@ -106,9 +118,12 @@ func runTest(p string) {
 	getShader(p)
 	copyTest(p)
 
+	path, _ := os.Getwd()
 	if !fLocal {
+		if fBench {
+			panic("benchmars inside DOC not yet suppored")
+		}
 		// run inside docer to test
-		path, _ := os.Getwd()
 		c := exec.Command("docker", "run", "-v", filepath.Join(path, "/build")+":/build", "--rm", imageName)
 		data, err := c.CombinedOutput()
 		if err == nil {
@@ -120,11 +135,24 @@ func runTest(p string) {
 		fmt.Println(string(data))
 		log.Fatalln("test failed")
 	} else {
-		// run local on this machine (faster?)c
+		// run local on this machine
 		c := exec.Command("./script/build.sh", "./build/test.comp")
 		data, err := c.CombinedOutput()
 		if err == nil {
-			fmt.Printf("PASS in %v\n", time.Now().Sub(ts))
+			if !fBench {
+				fmt.Printf("PASS in %v\n", time.Now().Sub(ts))
+				return
+			}
+
+			// run the benchmar and log the output
+			c := exec.Command("go", "test", "-run", "xxxxxx", "-benchtime", "2s", "-bench", ".")
+			c.Dir = filepath.Join(path, "build", "go")
+			c.Stderr = os.Stderr
+			c.Stdout = os.Stdout
+			err := c.Run()
+			if err != nil {
+				log.Fatalln("bench failed", err)
+			}
 			return
 		}
 		fmt.Println("\n")

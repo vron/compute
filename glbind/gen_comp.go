@@ -23,6 +23,8 @@ func generateComp(inp Input) {
 #define _cpt_WG_SIZE_Y %v
 #define _cpt_WG_SIZE_Z %v
 
+#import <math.h>
+
 `, inp.Wg_size[0], inp.Wg_size[1], inp.Wg_size[2])
 
 	writeSharedStruct(buf, inp)

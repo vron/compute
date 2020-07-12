@@ -14,7 +14,7 @@ void init_debug() {
     assert(pthread_mutex_init(&deb_lock, NULL)==0);
 }
 
-#define log(f_, ...) { \
+#define d_log(f_, ...) { \
     pthread_mutex_lock(&deb_lock); \
     printf("%20s() %12s:%-4d | ", __func__, __FILE__, __LINE__); \
     printf((f_), ##__VA_ARGS__); \
@@ -23,7 +23,7 @@ void init_debug() {
     pthread_mutex_unlock(&deb_lock); \
 };
 
-#define verbose(f_, ...) { \
+#define d_verbose(f_, ...) { \
     pthread_mutex_lock(&deb_lock); \
     printf("%20s() %12s:%-4d | ", __func__, __FILE__, __LINE__); \
     printf((f_), ##__VA_ARGS__); \
@@ -32,7 +32,7 @@ void init_debug() {
     pthread_mutex_unlock(&deb_lock); \
 };
 
-#define trace(f_, ...) { \
+#define d_trace(f_, ...) { \
     pthread_mutex_lock(&deb_lock); \
     printf("%20s() %12s:%-4d | ", __func__, __FILE__, __LINE__); \
     printf((f_), ##__VA_ARGS__); \
@@ -44,7 +44,7 @@ void init_debug() {
 
 #else
 void init_debug() {}
-#define log(f_, ...) {};
-#define verbose(f_, ...) {};
-#define trace(f_, ...) {};
+#define d_log(f_, ...) {};
+#define d_verbose(f_, ...) {};
+#define d_trace(f_, ...) {};
 #endif
