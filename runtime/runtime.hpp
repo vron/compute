@@ -30,6 +30,7 @@ struct kernel {
   }
 
   int ensure_alignments(cpt_data d) {
+    (void)d;
 #include "align.hpp"
   }
 
@@ -85,7 +86,7 @@ struct kernel {
                 k->gl_LocalInvocationID.y = ly;
                 k->gl_LocalInvocationID.x = lx;
                 k->gl_GlobalInvocationID = k->gl_WorkGroupID * make_uvec3(_cpt_WG_SIZE_X, _cpt_WG_SIZE_Y, _cpt_WG_SIZE_Z) + k->gl_LocalInvocationID;
-                k->gl_LocalInvocationIndex = lx + ly*_cpt_WG_SIZE_X + lx*_cpt_WG_SIZE_X*_cpt_WG_SIZE_Y;
+                k->gl_LocalInvocationIndex = lx + ly*_cpt_WG_SIZE_X + lz*_cpt_WG_SIZE_X*_cpt_WG_SIZE_Y;
                 
                 k->set_shared_data(sd);
                 int erno = k->set_data(d);

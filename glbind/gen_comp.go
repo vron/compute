@@ -92,6 +92,7 @@ func generateComp(inp Input) {
 	}
 
 	void set_shared_data(shared_data_t *sd) {
+		(void)sd;
 		`)
 
 	for _, arg := range inp.Shared {

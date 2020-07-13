@@ -41,25 +41,23 @@ func generateTypes(inp Input) {
 	defer buf.Flush()
 
 	buf.WriteString("// Code generated DO NOT EDIT\n")
-	buf.WriteString("\n\n")
+	buf.WriteString("#include <cmath>\n\n")
 
 	// Write some generiv defined
 	buf.WriteString("#define INL  __attribute__((always_inline))\n\n")
-	buf.WriteString(`enum __comp {
-	_ind_X = 0,
-	_ind_Y = 1,
-	_ind_Z = 2,
-	_ind_W = 3,
-};
-
+	buf.WriteString(`
+	
 
 `)
 	buf.WriteString("typedef int32_t Bool;\n\n")
 
+	// TODO: This entire thing could probably be made much smaller with templates... ?
 	generateVectorTypes(buf)
-	generateImageTypes(buf)
 	generateCreateVectors(buf)
+	generateImageTypes(buf)
 	generateBuiltinFunctions(buf)
+	generateMatrixTypes(buf)
+	generateCreateMatrices(buf)
 	generateUserStructs(buf, inp)
 }
 
@@ -71,6 +69,124 @@ func generateVectorTypes(buf *bufio.Writer) {
 		}
 	}
 	buf.WriteString("\n\n")
+}
+
+func generateMatrixTypes(buf *bufio.Writer) {
+
+	// TOOD: Is this modulu thing a reasonable thing to do?
+	buf.WriteString(`
+struct mat2;
+struct mat3;
+struct mat4;
+
+struct mat2 {
+	vec2 c[2];
+	
+	void from_api(float *arr) { this->c[0][0] = arr[0];this->c[0][1] = arr[1];this->c[1][0] = arr[2];this->c[1][1] = arr[3];};
+	//void from_api(float arr[4]) { this->c[0][0] = arr[0];this->c[0][1] = arr[1];this->c[1][0] = arr[2];this->c[1][1] = arr[3];};
+	vec2 &operator[](int index);
+
+};
+
+struct mat3 {
+	vec3 c[3];
+
+	void from_api(float *arr) { this->c[0][0] = arr[0];this->c[0][1] = arr[1];this->c[0][2] = arr[2];this->c[1][0] = arr[3];this->c[1][1] = arr[4];this->c[1][2] = arr[5];this->c[2][0] = arr[6];this->c[2][1] = arr[7];this->c[2][2] = arr[8];};
+	//void from_api(float arr[9]) { this->c[0][0] = arr[0];this->c[0][1] = arr[1];this->c[0][2] = arr[2];this->c[1][0] = arr[3];this->c[1][1] = arr[4];this->c[1][2] = arr[5];this->c[2][0] = arr[6];this->c[2][1] = arr[7];this->c[2][2] = arr[8];};
+	
+	vec3 &operator[](int index);
+};
+
+struct mat4 {
+	vec4 c[4];
+
+	void from_api(float *arr) { this->c[0][0] = arr[0];this->c[0][1] = arr[1];this->c[0][2] = arr[2];this->c[0][3] = arr[3];this->c[1][0] = arr[4];this->c[1][1] = arr[5];this->c[1][2] = arr[6];this->c[1][3] = arr[7];this->c[2][0] = arr[8];this->c[2][1] = arr[9];this->c[2][2] = arr[10];this->c[2][3] = arr[11];this->c[3][0] = arr[12];this->c[3][1] = arr[13];this->c[3][2] = arr[14];this->c[3][3] = arr[15];};
+	//void from_api(float arr[16]) { this->c[0][0] = arr[0];this->c[0][1] = arr[1];this->c[0][2] = arr[2];this->c[0][3] = arr[3];this->c[1][0] = arr[4];this->c[1][1] = arr[5];this->c[1][2] = arr[6];this->c[1][3] = arr[7];this->c[2][0] = arr[8];this->c[2][1] = arr[9];this->c[2][2] = arr[10];this->c[2][3] = arr[11];this->c[3][0] = arr[12];this->c[3][1] = arr[13];this->c[3][2] = arr[14];this->c[3][3] = arr[15];};
+	
+	vec4 &operator[](int index);
+
+
+};
+mat2 operator*(mat2 lhs, const mat2& rhs) {
+	for(int i = 0; i < 2; i++) {
+		vec2 row = make_vec2(lhs.c[0][i], lhs.c[1][i]);
+		lhs.c[0][i] = dot(row, rhs.c[0]);
+		lhs.c[1][i] = dot(row, rhs.c[1]);
+	}
+	return lhs;
+};
+mat3 operator*(mat3 lhs, const mat3& rhs) {
+	for(int i = 0; i < 3; i++) {
+		vec3 row = make_vec3(lhs.c[0][i], lhs.c[1][i], lhs.c[2][i]);
+		lhs.c[0][i] = dot(row, rhs.c[0]);
+		lhs.c[1][i] = dot(row, rhs.c[1]);
+		lhs.c[2][i] = dot(row, rhs.c[2]);
+	}
+	return lhs;
+};
+mat4 operator*(mat4 lhs, const mat4& rhs) {
+	for(int i = 0; i < 4; i++) {
+		vec4 row = make_vec4(lhs.c[0][i], lhs.c[1][i], lhs.c[2][i], lhs.c[3][i]);
+		lhs.c[0][i] = dot(row, rhs.c[0]);
+		lhs.c[1][i] = dot(row, rhs.c[1]);
+		lhs.c[2][i] = dot(row, rhs.c[2]);
+		lhs.c[3][i] = dot(row, rhs.c[3]);
+	}
+	return lhs;
+};
+vec2 operator*(mat2 lhs, const vec2& rhs) {
+	return make_vec2(lhs[0][0]*rhs[0] + lhs[1][0]*rhs[1],
+				lhs[0][1]*rhs[1] + lhs[1][1]*rhs[1]);
+};
+vec3 operator*(mat3 lhs, const vec3& rhs) {
+	return make_vec3(lhs[0][0]*rhs[0] + lhs[1][0]*rhs[1] + lhs[2][0]*rhs[2],
+				lhs[0][1]*rhs[0] + lhs[1][1]*rhs[1] + lhs[2][1]*rhs[2],
+				lhs[0][2]*rhs[0] + lhs[1][2]*rhs[1] + lhs[2][2]*rhs[2]);
+};
+vec4 operator*(mat4 lhs, const vec4& rhs) {
+	return make_vec4(lhs[0][0]*rhs[0] + lhs[1][0]*rhs[1] + lhs[2][0]*rhs[2] + lhs[3][0]*rhs[3],
+				lhs[0][1]*rhs[0] + lhs[1][1]*rhs[1] + lhs[2][1]*rhs[2] + lhs[3][1]*rhs[3],
+				lhs[0][2]*rhs[0] + lhs[1][2]*rhs[1] + lhs[2][2]*rhs[2] + lhs[3][2]*rhs[3],
+				lhs[0][3]*rhs[0] + lhs[1][3]*rhs[1] + lhs[2][3]*rhs[2] + lhs[3][3]*rhs[3]);
+};
+vec2 &mat2::operator[](int index) {
+	index = index % 2;
+	switch (index) {
+	case 0:
+	return (this->c[0]);
+	case 1:
+	return (this->c[1]);
+	}
+	__builtin_unreachable();
+}
+vec3 &mat3::operator[](int index) {
+	index = index % 3;
+	switch (index) {
+	case 0:
+	return (this->c[0]);
+	case 1:
+	return (this->c[1]);
+	case 2:
+	return (this->c[2]);
+	}
+	__builtin_unreachable();
+}
+vec4 &mat4::operator[](int index) {
+	index = index % 4;
+	switch (index) {
+	case 0:
+	return (this->c[0]);
+	case 1:
+	return (this->c[1]);
+	case 2:
+	return (this->c[2]);
+	case 3:
+	return (this->c[3]);
+	}
+	__builtin_unreachable();
+}
+
+`)
 }
 
 func compName(i int) string {
@@ -111,14 +227,6 @@ func generateImageTypes(buf *bufio.Writer) {
 }
 
 func generateCreateVectors(buf *bufio.Writer) {
-	// write the functions we use to create vectors, note that glsl supports 2
-	// options:
-	// 1 component only -> all fields have this value
-	// same number of components as vector, aggregated from scalar
-	// and vector parts.
-	// This means that there are quite many options for constructors to generate, so
-	// let us do that, we rely on clang dropping the definitions we do not use anyway
-	// so lets create them all and not du any runtime stuff that might be slow..
 	for _, typ := range vtypes {
 		for _, size := range vsizes {
 			printSingleCreate(buf, typ, size)
@@ -149,6 +257,62 @@ func printSingleCreate(buf *bufio.Writer, typ vinfo, size int) {
 	buf.WriteString("}; };\n")
 
 }
+
+func printSingleCreateMat(buf *bufio.Writer, size int) {
+	// a single value only will be placed on diagonal
+	for _, t := range []string{"uint32_t", "int32_t", "float", "double"} {
+		fmt.Fprintf(buf, "mat%v INL make_mat%v(%v v) { mat%v m; ", size, size, t, size)
+		for i := 0; i < size; i++ {
+			for j := 0; j < size; j++ {
+				if i != j {
+					fmt.Fprintf(buf, "m[%v][%v] = 0.0;", i, j)
+				} else {
+					fmt.Fprintf(buf, "m[%v][%v] = (float)v;", i, j)
+				}
+				buf.WriteString("; ")
+			}
+		}
+		buf.WriteString("return m; };\n")
+	}
+}
+
+func printMultipleCreateMat(buf *bufio.Writer, size int) {
+	// for now only support floats (to limit the number that becomes large..)
+	for no := 2; no <= size*size; no++ {
+		args := ""
+		body := ""
+		for i := 0; i < no; i++ {
+			args += fmt.Sprintf("float v%v,", i)
+
+			cn := i / size
+			rn := i % size
+
+			body += fmt.Sprintf("m.c[%v][%v] = v%v; ", cn, rn, i)
+		}
+		args = args[:len(args)-1]
+
+		fmt.Fprintf(buf, "mat%v INL make_mat%v("+args+") { mat%v m; ", size, size, size)
+
+		buf.WriteString(body + "return m; };\n")
+	}
+}
+
+func printVectorCreateMat(buf *bufio.Writer, size int) {
+	// for now only support vectors of the correct type and the correct size:
+
+	args := ""
+	body := ""
+	for i := 0; i < size; i++ {
+		args += fmt.Sprintf("vec%v v%v,", size, i)
+		body += fmt.Sprintf("m.c[%v] = v%v; ", i, i)
+	}
+	args = args[:len(args)-1]
+
+	fmt.Fprintf(buf, "mat%v INL make_mat%v("+args+") { mat%v m; ", size, size, size)
+
+	buf.WriteString(body + "return m; };\n")
+}
+
 func printMultipeCreate(buf *bufio.Writer, typ vinfo, size int) {
 	options := []aopt{{1, "float"}, {1, "int32_t"}, {1, "uint32_t"}}
 	for _, typ := range vtypes {
@@ -225,11 +389,28 @@ func genPossibleSizes(all *[][]aopt, current *[]aopt, target int, options []aopt
 	}
 }
 
+func generateCreateMatrices(buf *bufio.Writer) {
+	// first similarly to vectors out of scalar values
+	for _, size := range vsizes {
+		printSingleCreateMat(buf, size)
+		printMultipleCreateMat(buf, size)
+	}
+
+	// can also create vrom vector columns
+	for _, size := range vsizes {
+		printVectorCreateMat(buf, size)
+	}
+	// or from other matrices
+
+	buf.WriteString("\n\n")
+}
+
 func generateBuiltinFunctions(buf *bufio.Writer) {
 	//buf.WriteString("void barrier();\n")
 
 	fimageStoreLoad(buf)
 	fAtomic(buf)
+	fGeometricFunctions(buf)
 }
 
 func fimageStoreLoad(buf *bufio.Writer) {
@@ -290,6 +471,31 @@ func fAtomic(buf *bufio.Writer) {
 
 }
 
+func fGeometricFunctions(buf *bufio.Writer) {
+	// There seem to only be defined for float vectors, is that correct?
+	// TODO: Liely these implementations suffer from numeric problems and should be implemented in smarter ways...
+
+	buf.WriteString(`
+float cross(vec2 a, vec2 b) { return a[0]*b[1]-a[1]*b[0]; };
+float dot(vec2 a, vec2 b) { return a[0] * b[0] + a[1] * b[1]; };
+float length(vec2 a) { return sqrt(dot(a, a)); };
+float distance(vec2 a, vec2 b) { return length(a - b); };
+vec2 normalize(vec2 a) { return a / length(a); };
+vec3 cross(vec3 a, vec3 b) {
+	return make_vec3(a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]);
+}
+float dot(vec3 a, vec3 b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
+float length(vec3 a) { return sqrt(dot(a, a)); };
+float distance(vec3 a, vec3 b) { return length(a - b); };
+vec3 normalize(vec3 a) { return a / length(a); };
+float dot(vec4 a, vec4 b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]; };
+float length(vec4 a) { return sqrt(dot(a, a)); };
+float distance(vec4 a, vec4 b) { return length(a - b); };
+vec4 normalize(vec4 a) { return a / length(a); };
+	`)
+
+}
+
 func generateUserStructs(buf *bufio.Writer, inp Input) {
 	buf.WriteString("\n\n\n")
 
@@ -319,7 +525,11 @@ func generateUserStructs(buf *bufio.Writer, inp Input) {
 			if arl > 0 {
 				ex += fmt.Sprintf("[%v]", arl)
 			}
-			fmt.Fprintf(buf, "%v %v"+ex, f.Ty.ty.Name, f.Name)
+			strt := ""
+			if len(f.Ty.Fields) > 0 {
+				strt = " struct "
+			}
+			fmt.Fprintf(buf, "%v%v %v"+ex, strt, f.Ty.ty.Name, f.Name)
 			if i != len(s.CType().Fields)-1 {
 				buf.WriteString(", ")
 			}
@@ -397,15 +607,17 @@ func (cf CField) CxxBinding(buf io.Writer) {
 		fmt.Fprintf(buf, "\tthis->%v = (%v*)d.%v;\n", cf.Name, cf.Ty.ty.Name, cf.Name)
 		return
 	}
+	if cf.Ty.ArrayLen == 0 && (len(cf.Ty.Fields) > 0 || cf.Ty.ty.Name == "mat2" || cf.Ty.ty.Name == "mat3" || cf.Ty.ty.Name == "mat4") {
+		// this is a struct, assign each one of them, this must be done recursively!
+		fmt.Fprintf(buf, "\t(&(this->%v))->from_api(d.%v);\n", cf.Name, cf.Name)
+		return
+	}
 	if cf.Ty.ArrayLen == 0 {
-		if len(cf.Ty.Fields) > 0 {
-			// this is a struct, assign each one of them, this must be done recursively!
-			fmt.Fprintf(buf, "\t(&(this->%v))->from_api(d.%v);\n", cf.Name, cf.Name)
-			return
-		}
 		fmt.Fprintf(buf, "\tthis->%v = d.%v;\n", cf.Name, cf.Name)
 		return
 	}
+
+	// this is a matrix, for now handle it specifically until we figure out a way
 
 	// so it is an array of stuff, do the same for each once of the elements, but as a temp hac
 	// chec for the underlying type to set from that if needed
@@ -420,10 +632,18 @@ func (cf CField) CxxBinding(buf io.Writer) {
 		if len(cf.Ty.Fields) > 0 {
 			// this is a struct, assign each one of them, this must be done recursively!
 			fmt.Fprintf(buf, "\t(&(this->%v[%v]))->from_api(d.%v[%v]);\n", cf.Name, i, cf.Name, i)
+		} else if cf.Ty.ty.Name == "mat2" || cf.Ty.ty.Name == "mat3" || cf.Ty.ty.Name == "mat4" {
+			// binf it...
+
+			if arrlen > 1 {
+				fmt.Fprintf(buf, "\t(&(this->%v[%v]))->from_api(&d.%v[%v]);// mat bind\n", cf.Name, i, cf.Name, i*vecSize)
+			} else {
+				fmt.Fprintf(buf, "\t(&(this->%v))->from_api(d.%v);// mat bind\n", cf.Name, cf.Name)
+			}
 		} else {
 			if arrlen > 1 {
 				for j := 0; j < vecSize; j++ {
-					fmt.Fprintf(buf, "\tthis->%v[%v][%v] = d.%v[%v];\n", cf.Name, j, i, cf.Name, i*vecSize+j)
+					fmt.Fprintf(buf, "\tthis->%v[%v][%v] = d.%v[%v];\n", cf.Name, i, j, cf.Name, i*vecSize+j)
 				}
 			} else {
 				for j := 0; j < vecSize; j++ {

@@ -46,9 +46,10 @@ TODO: Write once I have commited to a design
 
 
 # TODO
- - Do not include builin types not in use...
- - benchmar suit
+ - Error messages in C instead of go
+ - Create referenceGo implementations of all benchmars
+ - Clean up go pacage
+ - Rewor api such that array of array instead of merging all the arrays when that is the case..
  - support multi-file shader with macros
  - Gain more performance but letting the compiler now we have ensured all the alignements
  - Document that all fields not of slices will be COPIED to not mess with cgo ( i.e  vec4[1000] is a bad idea perforamnce wise..)
- - idally we should be able to upload a *float as []float32?

@@ -84,7 +84,7 @@ func (tt *Types) ExportedStructTypes() (ts []*Type) {
 			ts = append(ts, v)
 		}
 	}
-	sort.Slice(ts, func(i, j int) bool { return ts[i].Name < ts[j].Name })
+	sort.Slice(ts, less(ts))
 	return
 }
 
@@ -92,7 +92,7 @@ func (tt *Types) AllTypes() (ts []*Type) {
 	for _, v := range tt.types {
 		ts = append(ts, v)
 	}
-	sort.Slice(ts, func(i, j int) bool { return ts[i].Name < ts[j].Name })
+	sort.Slice(ts, less(ts))
 	return
 }
 
@@ -102,7 +102,7 @@ func (tt *Types) UserStructs() (ts []*Type) {
 			ts = append(ts, v)
 		}
 	}
-	sort.Slice(ts, func(i, j int) bool { return ts[i].Name < ts[j].Name })
+	sort.Slice(ts, less(ts))
 	return
 }
 
@@ -162,12 +162,16 @@ func (cf CField) String() string {
 
 func (cf CField) CxxArrayLen() int {
 	rt := types.Get(cf.Ty.ty.Name)
-	if rt.CType().ArrayLen != 0 && rt.CType().ArrayLen != cf.Ty.ArrayLen {
-		size := cf.Ty.ArrayLen / rt.CType().ArrayLen
-		if size*rt.CType().ArrayLen != cf.Ty.ArrayLen {
-			panic("this cannot be an array, what is happening?")
+	if rt.CType().ArrayLen != cf.Ty.ArrayLen {
+		if rt.CType().ArrayLen != 0 {
+			size := cf.Ty.ArrayLen / rt.CType().ArrayLen
+			if size*rt.CType().ArrayLen != cf.Ty.ArrayLen {
+				panic("this cannot be an array, what is happening?")
+			}
+			return size
+		} else {
+			return cf.Ty.ArrayLen
 		}
-		return size
 	} else {
 		return 0
 	}
@@ -228,7 +232,7 @@ func (ct CType) GoName() string {
 }
 
 func createBasicBuiltinTypes() {
-	cbt := func(name string, cname string, noelc int, size int) {
+	cbt := func(name string, cname string, noelc int, size int, align int) {
 		tt := Type{
 			Name: name,
 		}
@@ -237,23 +241,26 @@ func createBasicBuiltinTypes() {
 			Name:     cname,
 			Fields:   []CField{},
 			ArrayLen: noelc,
-			Size:     Alignment{ByteSize: size, ByteAlignment: size},
+			Size:     Alignment{ByteSize: size, ByteAlignment: align},
 		}
 		types.types[name] = &tt
 	}
-	cbt("Bool", "int32_t", 0, 4) // here - how do we create go name?
-	cbt("int32_t", "int32_t", 0, 4)
-	cbt("uint32_t", "uint32_t", 0, 4)
-	cbt("float", "float", 0, 4)
-	cbt("vec2", "float", 2, 8)
-	cbt("vec3", "float", 3, 16)
-	cbt("vec4", "float", 4, 16)
-	cbt("ivec2", "int32_t", 2, 8)
-	cbt("ivec3", "int32_t", 3, 16)
-	cbt("ivec4", "int32_t", 4, 16)
-	cbt("uvec2", "uint32_t", 2, 8)
-	cbt("uvec3", "uint32_t", 3, 16)
-	cbt("uvec4", "uint32_t", 4, 16)
+	cbt("Bool", "int32_t", 0, 4, 4) // here - how do we create go name?
+	cbt("int32_t", "int32_t", 0, 4, 4)
+	cbt("uint32_t", "uint32_t", 0, 4, 4)
+	cbt("float", "float", 0, 4, 4)
+	cbt("vec2", "float", 2, 8, 8)
+	cbt("vec3", "float", 3, 16, 16)
+	cbt("vec4", "float", 4, 16, 16)
+	cbt("ivec2", "int32_t", 2, 8, 8)
+	cbt("ivec3", "int32_t", 3, 16, 16)
+	cbt("ivec4", "int32_t", 4, 16, 16)
+	cbt("uvec2", "uint32_t", 2, 8, 8)
+	cbt("uvec3", "uint32_t", 3, 16, 16)
+	cbt("uvec4", "uint32_t", 4, 16, 16)
+	cbt("mat2", "float", 4, 16, 8)
+	cbt("mat3", "float", 9, 16*3, 16)
+	cbt("mat4", "float", 16, 16*4, 16)
 }
 
 func createComplexBuiltinTypes() {
