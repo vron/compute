@@ -2,14 +2,17 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -58,7 +61,7 @@ func main() {
 		runTest(testFile)
 	}
 
-	fmt.Println("\nPASS")
+	fmt.Printf("\ntests ok\n")
 }
 
 func ensure(err error) {
@@ -111,8 +114,9 @@ func copyTest(p string) {
 
 func runTest(p string) {
 	once.Do(buildImage)
-	ts := time.Now()
-	fmt.Printf("~ test %v: ", p)
+	if !fBench {
+		fmt.Printf("%30s: ", filepath.Base(p))
+	}
 
 	cleanBuild()
 	getShader(p)
@@ -127,7 +131,7 @@ func runTest(p string) {
 		c := exec.Command("docker", "run", "-v", filepath.Join(path, "/build")+":/build", "--rm", imageName)
 		data, err := c.CombinedOutput()
 		if err == nil {
-			fmt.Printf("PASS in %v\n", time.Now().Sub(ts))
+			fmt.Printf("ok\n")
 			return
 		}
 		fmt.Println("\n")
@@ -140,7 +144,7 @@ func runTest(p string) {
 		data, err := c.CombinedOutput()
 		if err == nil {
 			if !fBench {
-				fmt.Printf("PASS in %v\n", time.Now().Sub(ts))
+				fmt.Printf("ok\n")
 				return
 			}
 
@@ -148,7 +152,7 @@ func runTest(p string) {
 			c := exec.Command("go", "test", "-run", "xxxxxx", "-benchtime", "2s", "-bench", ".")
 			c.Dir = filepath.Join(path, "build", "go")
 			c.Stderr = os.Stderr
-			c.Stdout = os.Stdout
+			c.Stdout = resultsOnly(os.Stdout)
 			err := c.Run()
 			if err != nil {
 				log.Fatalln("bench failed", err)
@@ -160,6 +164,27 @@ func runTest(p string) {
 		fmt.Println(string(data))
 		log.Fatalln("test failed")
 	}
+}
+
+// return a filtering writer that will only write lines that
+// are benchmar results to the output such that we get a nice
+// printing of it all..
+func resultsOnly(w io.Writer) io.Writer {
+	pr, pw := io.Pipe()
+
+	go func() {
+		scanner := bufio.NewScanner(pr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "Benchmar") {
+				io.WriteString(w, line+"\n")
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			log.Println("reading input:", err)
+		}
+	}()
+	return pw
 }
 
 func copy(dst, src string) {
