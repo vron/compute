@@ -32,7 +32,7 @@ var vtypes = []vinfo{
 var vsizes = []int{2, 3, 4}
 
 func generateTypes(inp Input) {
-	f, err := os.Create(filepath.Join(fOut, "types.hpp"))
+	f, err := os.Create(filepath.Join(fOut, "generated/usertypes.hpp"))
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -42,152 +42,17 @@ func generateTypes(inp Input) {
 
 	buf.WriteString("#pragma once\n")
 	buf.WriteString("// Code generated DO NOT EDIT\n")
-	buf.WriteString("#include <cmath>\n\n")
-
-	// Write some generiv defined
-	buf.WriteString("#define INL  __attribute__((always_inline))\n\n")
-	buf.WriteString(`
-	
-
-`)
-	buf.WriteString("typedef int32_t Bool;\n\n")
+	buf.WriteString("#include \"../types/types.hpp\"\n")
+	buf.WriteString("#include \"./shared.h\"\n")
 
 	// TODO: This entire thing could probably be made much smaller with templates... ?
-	generateVectorTypes(buf)
-	generateCreateVectors(buf)
-	generateImageTypes(buf)
-	generateBuiltinFunctions(buf)
-	generateMatrixTypes(buf)
-	generateCreateMatrices(buf)
+	//generateCreateVectors(buf)
+	//generateImageTypes(buf)
+	//generateBuiltinFunctions(buf)
+	//generateMatrixTypes(buf)
+	//generateCreateMatrices(buf)
 	generateUserStructs(buf, inp)
-}
-
-func generateVectorTypes(buf *bufio.Writer) {
-	// Forward decl.
-	for _, typ := range vtypes {
-		for _, size := range vsizes {
-			fmt.Fprintf(buf, "typedef %v %vvec%v __attribute__((ext_vector_type(%v)));;\n", typ.underlyingType, typ.typeSpec, size, size)
-		}
-	}
-	buf.WriteString("\n\n")
-}
-
-func generateMatrixTypes(buf *bufio.Writer) {
-
-	// TOOD: Is this modulu thing a reasonable thing to do?
-	buf.WriteString(`
-struct mat2;
-struct mat3;
-struct mat4;
-
-struct mat2 {
-	vec2 c[2];
-	
-	void from_api(float *arr) { this->c[0][0] = arr[0];this->c[0][1] = arr[1];this->c[1][0] = arr[2];this->c[1][1] = arr[3];};
-	//void from_api(float arr[4]) { this->c[0][0] = arr[0];this->c[0][1] = arr[1];this->c[1][0] = arr[2];this->c[1][1] = arr[3];};
-	vec2 &operator[](int index);
-
-};
-
-struct mat3 {
-	vec3 c[3];
-
-	void from_api(float *arr) { this->c[0][0] = arr[0];this->c[0][1] = arr[1];this->c[0][2] = arr[2];this->c[1][0] = arr[3];this->c[1][1] = arr[4];this->c[1][2] = arr[5];this->c[2][0] = arr[6];this->c[2][1] = arr[7];this->c[2][2] = arr[8];};
-	//void from_api(float arr[9]) { this->c[0][0] = arr[0];this->c[0][1] = arr[1];this->c[0][2] = arr[2];this->c[1][0] = arr[3];this->c[1][1] = arr[4];this->c[1][2] = arr[5];this->c[2][0] = arr[6];this->c[2][1] = arr[7];this->c[2][2] = arr[8];};
-	
-	vec3 &operator[](int index);
-};
-
-struct mat4 {
-	vec4 c[4];
-
-	void from_api(float *arr) { this->c[0][0] = arr[0];this->c[0][1] = arr[1];this->c[0][2] = arr[2];this->c[0][3] = arr[3];this->c[1][0] = arr[4];this->c[1][1] = arr[5];this->c[1][2] = arr[6];this->c[1][3] = arr[7];this->c[2][0] = arr[8];this->c[2][1] = arr[9];this->c[2][2] = arr[10];this->c[2][3] = arr[11];this->c[3][0] = arr[12];this->c[3][1] = arr[13];this->c[3][2] = arr[14];this->c[3][3] = arr[15];};
-	//void from_api(float arr[16]) { this->c[0][0] = arr[0];this->c[0][1] = arr[1];this->c[0][2] = arr[2];this->c[0][3] = arr[3];this->c[1][0] = arr[4];this->c[1][1] = arr[5];this->c[1][2] = arr[6];this->c[1][3] = arr[7];this->c[2][0] = arr[8];this->c[2][1] = arr[9];this->c[2][2] = arr[10];this->c[2][3] = arr[11];this->c[3][0] = arr[12];this->c[3][1] = arr[13];this->c[3][2] = arr[14];this->c[3][3] = arr[15];};
-	
-	vec4 &operator[](int index);
-
-
-};
-mat2 operator*(mat2 lhs, const mat2& rhs) {
-	for(int i = 0; i < 2; i++) {
-		vec2 row = make_vec2(lhs.c[0][i], lhs.c[1][i]);
-		lhs.c[0][i] = dot(row, rhs.c[0]);
-		lhs.c[1][i] = dot(row, rhs.c[1]);
-	}
-	return lhs;
-};
-mat3 operator*(mat3 lhs, const mat3& rhs) {
-	for(int i = 0; i < 3; i++) {
-		vec3 row = make_vec3(lhs.c[0][i], lhs.c[1][i], lhs.c[2][i]);
-		lhs.c[0][i] = dot(row, rhs.c[0]);
-		lhs.c[1][i] = dot(row, rhs.c[1]);
-		lhs.c[2][i] = dot(row, rhs.c[2]);
-	}
-	return lhs;
-};
-mat4 operator*(mat4 lhs, const mat4& rhs) {
-	for(int i = 0; i < 4; i++) {
-		vec4 row = make_vec4(lhs.c[0][i], lhs.c[1][i], lhs.c[2][i], lhs.c[3][i]);
-		lhs.c[0][i] = dot(row, rhs.c[0]);
-		lhs.c[1][i] = dot(row, rhs.c[1]);
-		lhs.c[2][i] = dot(row, rhs.c[2]);
-		lhs.c[3][i] = dot(row, rhs.c[3]);
-	}
-	return lhs;
-};
-vec2 operator*(mat2 lhs, const vec2& rhs) {
-	return make_vec2(lhs[0][0]*rhs[0] + lhs[1][0]*rhs[1],
-				lhs[0][1]*rhs[1] + lhs[1][1]*rhs[1]);
-};
-vec3 operator*(mat3 lhs, const vec3& rhs) {
-	return make_vec3(lhs[0][0]*rhs[0] + lhs[1][0]*rhs[1] + lhs[2][0]*rhs[2],
-				lhs[0][1]*rhs[0] + lhs[1][1]*rhs[1] + lhs[2][1]*rhs[2],
-				lhs[0][2]*rhs[0] + lhs[1][2]*rhs[1] + lhs[2][2]*rhs[2]);
-};
-vec4 operator*(mat4 lhs, const vec4& rhs) {
-	return make_vec4(lhs[0][0]*rhs[0] + lhs[1][0]*rhs[1] + lhs[2][0]*rhs[2] + lhs[3][0]*rhs[3],
-				lhs[0][1]*rhs[0] + lhs[1][1]*rhs[1] + lhs[2][1]*rhs[2] + lhs[3][1]*rhs[3],
-				lhs[0][2]*rhs[0] + lhs[1][2]*rhs[1] + lhs[2][2]*rhs[2] + lhs[3][2]*rhs[3],
-				lhs[0][3]*rhs[0] + lhs[1][3]*rhs[1] + lhs[2][3]*rhs[2] + lhs[3][3]*rhs[3]);
-};
-vec2 &mat2::operator[](int index) {
-	index = index % 2;
-	switch (index) {
-	case 0:
-	return (this->c[0]);
-	case 1:
-	return (this->c[1]);
-	}
-	__builtin_unreachable();
-}
-vec3 &mat3::operator[](int index) {
-	index = index % 3;
-	switch (index) {
-	case 0:
-	return (this->c[0]);
-	case 1:
-	return (this->c[1]);
-	case 2:
-	return (this->c[2]);
-	}
-	__builtin_unreachable();
-}
-vec4 &mat4::operator[](int index) {
-	index = index % 4;
-	switch (index) {
-	case 0:
-	return (this->c[0]);
-	case 1:
-	return (this->c[1]);
-	case 2:
-	return (this->c[2]);
-	case 3:
-	return (this->c[3]);
-	}
-	__builtin_unreachable();
-}
-
-`)
+	generatefromapi(buf, inp)
 }
 
 func compName(i int) string {
@@ -214,15 +79,6 @@ func generateImageTypes(buf *bufio.Writer) {
 	int width;
   
 	`)
-	if types.Get("image2Drgba32f").apiType {
-		buf.WriteString(`	void from_api(cpt_image2Drgba32f d) {
-			this->data = (float*)d.data;
-			this->width = d.width;
-		};
-
-		`)
-	}
-	buf.WriteString("};\n")
 
 	buf.WriteString("\n\n")
 }
@@ -554,32 +410,9 @@ func generateUserStructs(buf *bufio.Writer, inp Input) {
 		}
 		fmt.Fprintf(buf, " {};\n")
 
-		// we also need to construct a from_api function to copy over data from
-		// the api structs - only arrays we enforce user to handle the alignment
-		// WE simply declare it here and define it below, if we have to refer to
-		// ourselves somewhere
-		if s.apiType {
-			fmt.Fprintf(buf, "\tvoid from_api(%v);\n", s.CType().Name)
-		}
-
 		buf.WriteString("};\n\n")
 	}
 
-	// Write implementation for the from api methods, copying field by field (rec if needed)
-	for _, s := range types.UserStructs() {
-		if s.apiType {
-			fmt.Fprintf(buf, "void %v::from_api(%v d) {\n", s.Name, s.CType().Name)
-
-			for _, cf := range s.CType().Fields {
-				cf.CxxBinding(buf)
-			}
-
-			fmt.Fprintf(buf, "};\n\n")
-		}
-
-	}
-
-	buf.WriteString("\n")
 }
 
 /*
@@ -605,16 +438,16 @@ func bVec(size int) func(InputArgument) string {
 func (cf CField) CxxBinding(buf io.Writer) {
 	if cf.Ty.IsSlice {
 		// slice type, the incomeing is *void and we assume everyhting is layed out, assign!
-		fmt.Fprintf(buf, "\tthis->%v = (%v*)d.%v;\n", cf.Name, cf.Ty.ty.Name, cf.Name)
+		fmt.Fprintf(buf, "\tme->%v = (%v*)d.%v;\n", cf.Name, cf.Ty.ty.Name, cf.Name)
 		return
 	}
 	if cf.Ty.ArrayLen == 0 && (len(cf.Ty.Fields) > 0 || cf.Ty.ty.Name == "mat2" || cf.Ty.ty.Name == "mat3" || cf.Ty.ty.Name == "mat4") {
 		// this is a struct, assign each one of them, this must be done recursively!
-		fmt.Fprintf(buf, "\t(&(this->%v))->from_api(d.%v);\n", cf.Name, cf.Name)
+		fmt.Fprintf(buf, "\tfrom_api(&(me->%v), d.%v);\n", cf.Name, cf.Name)
 		return
 	}
 	if cf.Ty.ArrayLen == 0 {
-		fmt.Fprintf(buf, "\tthis->%v = d.%v;\n", cf.Name, cf.Name)
+		fmt.Fprintf(buf, "\tme->%v = d.%v;\n", cf.Name, cf.Name)
 		return
 	}
 
@@ -632,25 +465,51 @@ func (cf CField) CxxBinding(buf io.Writer) {
 	for i := 0; i < arrlen; i++ {
 		if len(cf.Ty.Fields) > 0 {
 			// this is a struct, assign each one of them, this must be done recursively!
-			fmt.Fprintf(buf, "\t(&(this->%v[%v]))->from_api(d.%v[%v]);\n", cf.Name, i, cf.Name, i)
+			fmt.Fprintf(buf, "\tfrom_api(&(me->%v[%v]), d.%v[%v]);\n", cf.Name, i, cf.Name, i)
 		} else if cf.Ty.ty.Name == "mat2" || cf.Ty.ty.Name == "mat3" || cf.Ty.ty.Name == "mat4" {
 			// binf it...
 
 			if arrlen > 1 {
-				fmt.Fprintf(buf, "\t(&(this->%v[%v]))->from_api(&d.%v[%v]);// mat bind\n", cf.Name, i, cf.Name, i*vecSize)
+				fmt.Fprintf(buf, "\tfrom_api(&(me->%v[%v]), &d.%v[%v]);// mat bind\n", cf.Name, i, cf.Name, i*vecSize)
 			} else {
-				fmt.Fprintf(buf, "\t(&(this->%v))->from_api(d.%v);// mat bind\n", cf.Name, cf.Name)
+				fmt.Fprintf(buf, "\tfrom_api(&(me->%v), d.%v);// mat bind\n", cf.Name, cf.Name)
 			}
 		} else {
 			if arrlen > 1 {
 				for j := 0; j < vecSize; j++ {
-					fmt.Fprintf(buf, "\tthis->%v[%v][%v] = d.%v[%v];\n", cf.Name, i, j, cf.Name, i*vecSize+j)
+					fmt.Fprintf(buf, "\tme->%v[%v][%v] = d.%v[%v];\n", cf.Name, i, j, cf.Name, i*vecSize+j)
 				}
 			} else {
 				for j := 0; j < vecSize; j++ {
-					fmt.Fprintf(buf, "\tthis->%v[%v] = d.%v[%v];\n", cf.Name, j, cf.Name, j)
+					fmt.Fprintf(buf, "\tme->%v[%v] = d.%v[%v];\n", cf.Name, j, cf.Name, j)
 				}
 			}
 		}
 	}
+}
+
+func generatefromapi(buf *bufio.Writer, inp Input) {
+	/*
+		if types.Get("image2Drgba32f").apiType {
+			buf.WriteString(`	void from_api(cpt_image2Drgba32f d) {
+			this->data = (float*)d.data;
+			this->width = d.width;
+		};
+
+		`)
+		}
+		buf.WriteString("};\n")
+	*/
+	// Write implementation for the from api methods, copying field by field (rec if needed)
+	for _, s := range types.ExportedStructTypes() {
+		fmt.Fprintf(buf, "void from_api(%v *me, %v d) {\n", s.Name, s.CType().Name)
+
+		for _, cf := range s.CType().Fields {
+			cf.CxxBinding(buf)
+		}
+
+		fmt.Fprintf(buf, "};\n\n")
+	}
+
+	buf.WriteString("\n")
 }

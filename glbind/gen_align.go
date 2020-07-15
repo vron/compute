@@ -9,7 +9,7 @@ import (
 )
 
 func generateAlignH(inp Input) {
-	f, err := os.Create(filepath.Join(fOut, "align.hpp"))
+	f, err := os.Create(filepath.Join(fOut, "generated/align.hpp"))
 
 	if err != nil {
 		log.Fatalln(err)

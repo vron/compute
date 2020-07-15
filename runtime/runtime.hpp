@@ -1,8 +1,13 @@
 #pragma once
 
+struct thread_data;
+
 #include "debug.hpp"
 #include <cstring>
 #include <thread>
+#include "./types/types.hpp"
+#include "threads.hpp"
+#include "./generated/shader.hpp"
 
 struct thread_data {
   pthread_barrier_t *barrier;
@@ -90,22 +95,13 @@ struct error_t kernel::dispatch(cpt_data d, int32_t nx, int32_t ny,
               long index = lx + ly * _cpt_WG_SIZE_X +
                            lz * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X;
               shader *k = new shader();
-
-              k->gl_NumWorkGroups.z = nz;
-              k->gl_NumWorkGroups.y = ny;
-              k->gl_NumWorkGroups.x = nx;
-              k->gl_WorkGroupID.z = gz;
-              k->gl_WorkGroupID.y = gy;
-              k->gl_WorkGroupID.x = gx;
-              k->gl_WorkGroupSize.z = _cpt_WG_SIZE_Z;
-              k->gl_WorkGroupSize.y = _cpt_WG_SIZE_Y;
-              k->gl_WorkGroupSize.x = _cpt_WG_SIZE_X;
-              k->gl_LocalInvocationID.z = lz;
-              k->gl_LocalInvocationID.y = ly;
-              k->gl_LocalInvocationID.x = lx;
+              
+              k->gl_NumWorkGroups = make_uvec3(nx, ny, nz);
+              k->gl_WorkGroupID = make_uvec3(gx, gy, gz);
+              k->gl_WorkGroupSize = make_uvec3(_cpt_WG_SIZE_X, _cpt_WG_SIZE_Y, _cpt_WG_SIZE_Z);
+              k->gl_LocalInvocationID = make_uvec3(lx, ly, lz);
               k->gl_GlobalInvocationID =
-                  k->gl_WorkGroupID * make_uvec3(_cpt_WG_SIZE_X, _cpt_WG_SIZE_Y,
-                                                 _cpt_WG_SIZE_Z) +
+                  k->gl_WorkGroupID * k->gl_WorkGroupSize +
                   k->gl_LocalInvocationID;
               k->gl_LocalInvocationIndex = lx + ly * _cpt_WG_SIZE_X +
                                            lz * _cpt_WG_SIZE_X * _cpt_WG_SIZE_Y;
@@ -158,4 +154,4 @@ struct error_t kernel::dispatch(cpt_data d, int32_t nx, int32_t ny,
   return this->error();
 }
 
-#include "align.hpp"
+#include "./generated/align.hpp"

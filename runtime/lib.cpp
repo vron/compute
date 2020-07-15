@@ -1,18 +1,13 @@
 // export only the symbols in shared to allow efficient dce.
 #pragma GCC visibility push(default)
 extern "C" {
-#include "shared.h"
+#include "./generated/shared.h"
 }
 #pragma GCC visibility pop
 
-// clang-format off
-struct thread_data;
 #include "debug.hpp"
-#include "threads.hpp" // wraps system threading libraries to support platforms
-#include "types.hpp"   // implementations of glsl types and functions
-#include "kernel.hpp"  // the kernel code generated from the glsl shader
-#include "runtime.hpp" // the runtime scheduling execution
-// clang-format on
+#include "runtime.hpp"
+#include "threads.hpp"
 
 extern "C" {
 

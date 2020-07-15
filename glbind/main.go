@@ -60,7 +60,6 @@ func main() {
 
 	generateSharedH(inp)
 	generateTypes(inp)
-	generateSetData(inp)
 	generateComp(inp)
 	generateAlignH(inp)
 	generateGo(inp)

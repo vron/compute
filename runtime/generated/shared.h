@@ -1,14 +1,14 @@
-// This file will be generated as part of the build, this is an example only
-
+#pragma once
 /*
   This header and associated library was generated from a GLSL compute shader
   to be executed on a CPU as static code. The library is safe for threaded use
   as further specified below.
 */
+#include "errno.h"
 #include "stdint.h"
 
 /*
-  error_t represents an error as reported from cpt_dispatch_kernel. The
+  error_t represents an error as reported from cpt_dispatch_kernel. The 
   possible errors can mostly be classified as either user errors or underlying
   system errors. In case of underlying errors, such as insufficient resources,
   the .code field will be set to an error code from errno.h. In case of user
@@ -19,8 +19,16 @@
 */
 struct error_t {
   int code;
-  char *msg;
+  char* msg;
 };
+
+typedef struct {
+  float vertices[6];
+} cpt_triangle;
+
+typedef struct {
+  cpt_triangle triangles[64];
+} cpt_polygon;
 
 /*
   cpt_data consists of all the input/output required by the compute kernel. All
@@ -29,8 +37,9 @@ struct error_t {
   ensure sufficient length and data alignment for the relevant use.
 */
 typedef struct {
-  void *din;
-  void *dout;
+  float transform[9];
+  void* polygons;
+  void* cogs;
 } cpt_data;
 
 /*
@@ -56,8 +65,7 @@ void *cpt_new_kernel(int32_t num_t);
   different kernel references (k) but must not be called concurrently for the
   same k.
 */
-struct error_t cpt_dispatch_kernel(void *k, cpt_data d, int32_t x, int32_t y,
-                                   int32_t z);
+struct error_t cpt_dispatch_kernel(void *k, cpt_data d, int32_t x, int32_t y, int32_t z);
 
 /*
   cpt_free_kernel must be called for any non-null kernel k created to avoid

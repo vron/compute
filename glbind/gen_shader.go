@@ -10,7 +10,7 @@ import (
 )
 
 func generateComp(inp Input) {
-	f, err := os.Create(filepath.Join(fOut, "kernel.hpp"))
+	f, err := os.Create(filepath.Join(fOut, "generated/shader.hpp"))
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -23,7 +23,9 @@ func generateComp(inp Input) {
 #define _cpt_WG_SIZE_Y %v
 #define _cpt_WG_SIZE_Z %v
 
-#import <math.h>
+#include <cmath>
+#include "../types/types.hpp"
+#include "./usertypes.hpp"
 
 `, inp.Wg_size[0], inp.Wg_size[1], inp.Wg_size[2])
 
@@ -59,7 +61,10 @@ func generateComp(inp Input) {
 	buf.WriteString("\n")
 	buf.WriteString(`
 	void set_data(cpt_data d) {
-		#include "setdata.hpp"
+	auto me = this;
+`)
+	generateSetData(buf, inp)
+	buf.WriteString(`
 	}
 `)
 	buf.WriteString(`
@@ -111,4 +116,20 @@ func writeSharedStruct(buf io.Writer, inp Input) {
 		fmt.Fprintf(buf, cf.CxxFieldString()+"\n")
 	}
 	fmt.Fprintf(buf, "} ;\n\n")
+}
+
+func generateSetData(buf *bufio.Writer, inp Input) {
+	// we have an variable d of the data struct type that we need
+	// to translate to the member variables.
+
+	for _, a := range inp.Arguments {
+		cf := CField{
+			Name: a.Name,
+			Ty:   maybeCreateArrayType(a.Ty, a.Arrno),
+		}
+		//recChecAlignment(buf, inp, cf, "d.")
+		cf.CxxBinding(buf)
+	}
+
+	buf.WriteString("\treturn;")
 }

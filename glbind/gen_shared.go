@@ -9,7 +9,7 @@ import (
 )
 
 func generateSharedH(inp Input) {
-	f, err := os.Create(filepath.Join(fOut, "shared.h"))
+	f, err := os.Create(filepath.Join(fOut, "generated/shared.h"))
 
 	if err != nil {
 		log.Fatalln(err)
@@ -17,7 +17,8 @@ func generateSharedH(inp Input) {
 	defer f.Close()
 	buf := bufio.NewWriter(f)
 	defer buf.Flush()
-	buf.WriteString(`/*
+	buf.WriteString(`#pragma once
+/*
   This header and associated library was generated from a GLSL compute shader
   to be executed on a CPU as static code. The library is safe for threaded use
   as further specified below.
