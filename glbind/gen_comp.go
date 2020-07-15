@@ -29,7 +29,7 @@ func generateComp(inp Input) {
 
 	writeSharedStruct(buf, inp)
 
-	buf.WriteString("struct kernel_comp {\n")
+	buf.WriteString("struct shader {\n")
 	buf.WriteString("\tuvec3 gl_NumWorkGroups;\n")
 	buf.WriteString("\tuvec3 gl_WorkGroupSize;\n")
 	buf.WriteString("\tuvec3 gl_WorkGroupID;\n")
@@ -51,14 +51,14 @@ func generateComp(inp Input) {
 	}
 
 	buf.WriteString("\n")
-	buf.WriteString("\tkernel_comp() {};\n")
+	buf.WriteString("\tshader() {};\n")
 	buf.WriteString("\n")
 
 	buf.WriteString(inp.Body)
 	buf.WriteString("\n")
 	buf.WriteString("\n")
 	buf.WriteString(`
-	int set_data(cpt_data d) {
+	void set_data(cpt_data d) {
 		#include "setdata.hpp"
 	}
 `)

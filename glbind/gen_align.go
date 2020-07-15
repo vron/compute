@@ -18,15 +18,15 @@ func generateAlignH(inp Input) {
 	buf := bufio.NewWriter(f)
 	defer buf.Flush()
 
-	// chec alignments and sizes of the computation types we will use
+	buf.WriteString("#include <cerrno>\n\nbool kernel::ensure_alignments(cpt_data d) {\n\t(void)d;\n")
+
 	cSize := func(ty string, al int) {
-		erno := newError("static check failed: sizeof(%v) != %v", ty, al)
-		fmt.Fprintf(buf, "\tif(sizeof(%v) != %v) { return %v; };\n", ty, al, erno)
-		//fmt.Fprintf(buf, "\tif(sizeof(%v) != %v) { printf(\"%v\\n\", sizeof(%v)); return %v; };\n", ty, al, "%d", ty, erno)
+		msg := fmt.Sprintf("static check failed: sizeof(%v) != %v", ty, al)
+		fmt.Fprintf(buf, "\tif(sizeof(%v) != %v) { return this->set_error(EINVAL, \"%v\"); };\n", ty, al, msg)
 	}
 	cAlign := func(ty string, al int) {
-		erno := newError("static check failed: alignof(%v) != %v", ty, al)
-		fmt.Fprintf(buf, "\tif(alignof(%v) != %v) { return %v; };\n", ty, al, erno)
+		msg := fmt.Sprintf("static check failed: alignof(%v) != %v", ty, al)
+		fmt.Fprintf(buf, "\tif(alignof(%v) != %v) { return this->set_error(EINVAL, \"%v\"); };\n", ty, al, msg)
 	}
 	for _, v := range types.AllTypes() {
 		cSize(v.Name, v.CType().Size.ByteSize)
@@ -41,7 +41,9 @@ func generateAlignH(inp Input) {
 		}
 		recChecAlignment(buf, inp, cf, "d.")
 	}
-	buf.WriteString("\n\treturn 0;\n")
+
+	buf.WriteString("\n\treturn true;\n")
+	buf.WriteString("}\n")
 
 }
 
@@ -49,8 +51,8 @@ func recChecAlignment(buf *bufio.Writer, inp Input, cf CField, head string) {
 	if cf.Ty.IsSlice {
 		// this is a slice, will be provided as pointer so chec it
 		ai := cf.Ty.Size
-		erno := newError("the argument %v provided was not aligned to a %v byte boundary as required", head+cf.Name, ai.ByteAlignment)
-		fmt.Fprintf(buf, "\tif((((uintptr_t)(const void *)(%v)) %% (%v)) != 0) { return %v; };\n", head+cf.Name, ai.ByteSize, erno)
+		msg := fmt.Sprintf("the argument %v provided was not aligned to a %v byte boundary as required", head+cf.Name, ai.ByteAlignment)
+		fmt.Fprintf(buf, "\tif((((uintptr_t)(const void *)(%v)) %% (%v)) != 0) { return this->set_error(EINVAL, \"%v\"); };\n", head+cf.Name, ai.ByteSize, msg)
 
 		return
 	}

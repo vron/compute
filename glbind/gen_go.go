@@ -107,12 +107,15 @@ func (k *kernel) Dispatch(bind Data, numx, numy, numz int) error {
 	// of bad data provided...
 	buf.Write(chc.Bytes())
 	buf.WriteString(`
-	errno := C.cpt_dispatch_kernel(k.k, cbind, C.int(numx), C.int(numy), C.int(numz))
-	`)
+	errno := C.cpt_dispatch_kernel(k.k, cbind, C.int(numx), C.int(numy), C.int(numz))`)
 
-	// do the actuall call to the function the c code exposes
-
-	buf.WriteString(`return mapErrno(int(errno))
+	// decode the error message
+	buf.WriteString(`
+	if errno.code == 0 {
+		return nil
+	}
+	errstr := C.GoString(errno.msg)
+	return errors.New(strconv.Itoa(int(errno.code)) + ": " + errstr)
 }
 
 // Free dealocates any data allocated by the underlying kernel. Note that
@@ -128,24 +131,6 @@ func freeKernel(k *kernel) {
 	}
 	k.dead = true
 	C.cpt_free_kernel(k.k);
-}
-
-var dispatchErrors = map[int]string{
-`)
-	for i, e := range errors {
-		fmt.Fprintf(buf, `	%v: "%v",`+"\n", i, e)
-	}
-	buf.WriteString(`}
-
-func mapErrno(errno int) error {
-	if errno == 0 {
-		return nil
-	}
-	v, ok :=dispatchErrors[errno]
-	if !ok {
-		v = "unknown error code"
-	}
-	return errors.New(v + ": " + strconv.Itoa(errno))
 }
 
 func cBool(b bool) int32 {

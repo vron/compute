@@ -1,23 +1,46 @@
-// This file will be generated as part of the build, this is an example only
 
-#define _cpt_WG_SIZE_X 8
-#define _cpt_WG_SIZE_Y 8
-#define _cpt_WG_SIZE_Z 1
+#define _cpt_WG_SIZE_X 2
+#define _cpt_WG_SIZE_Y 2
+#define _cpt_WG_SIZE_Z 2
 
-struct kernel_comp {
-  uvec3 gl_GlobalInvocationID;
+#include <math.h>
+
+class shared_data_t {
+public:
+};
+
+struct shader {
+  uvec3 gl_NumWorkGroups;
+  uvec3 gl_WorkGroupSize;
+  uvec3 gl_WorkGroupID;
   uvec3 gl_LocalInvocationID;
-  image2DRGBA32F image;
+  uvec3 gl_GlobalInvocationID;
+  uint32_t gl_LocalInvocationIndex;
+  thread_data *thread;
+
+  float *din;
+
+  float *dout;
+
+  shader(){};
+
   void main() {
-    vec4_scalar pixel = make_vec4(0.f, 0.f, 0.f, 1.f);
-    uvec2 pixel_coords;
-    pixel_coords = (gl_GlobalInvocationID).sel(_ind_X, _ind_Y);
-    pixel_coords *= 8;
-    pixel_coords += (gl_LocalInvocationID).sel(_ind_X, _ind_Y);
-    imageStore(image, make_ivec2(pixel_coords), pixel);
+    
   }
 
-  int set_data(kernel_data d) {
-	#include "setdata.hpp"
+  int set_data(cpt_data d) {
+#include "setdata.hpp"
   }
+
+  void barrier();
+
+  static shared_data_t *create_shared_data() {
+    shared_data_t *sd = new shared_data_t();
+
+    return sd;
+  }
+
+  static void free_shared_data(shared_data_t *sd) { delete sd; }
+
+  void set_shared_data(shared_data_t *sd) { (void)sd; }
 };

@@ -1,6 +1,9 @@
+#pragma once
 /* (C) Copyright 2019 Robert Sauter
  * SPDX-License-Identifier: MIT
  */
+
+
 
 /** Pthread-barrier implementation for macOS */
 

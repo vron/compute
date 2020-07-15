@@ -40,6 +40,7 @@ func generateTypes(inp Input) {
 	buf := bufio.NewWriter(f)
 	defer buf.Flush()
 
+	buf.WriteString("#pragma once\n")
 	buf.WriteString("// Code generated DO NOT EDIT\n")
 	buf.WriteString("#include <cmath>\n\n")
 

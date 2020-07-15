@@ -24,9 +24,9 @@ func generateSetData(inp Input) {
 			Name: a.Name,
 			Ty:   maybeCreateArrayType(a.Ty, a.Arrno),
 		}
-		recChecAlignment(buf, inp, cf, "d.")
+		//recChecAlignment(buf, inp, cf, "d.")
 		cf.CxxBinding(buf)
 	}
 
-	buf.WriteString("\treturn 0;")
+	buf.WriteString("\treturn;")
 }

@@ -1,141 +1,174 @@
+#pragma once
+
+#include "debug.hpp"
+#include <cstring>
 
 struct thread_data {
   pthread_barrier_t *barrier;
   pthread_t thread;
-  kernel_comp *kernel;
+  shader *kernel;
 };
 
 void *thread_core(void *ptr) {
   struct thread_data *td = (struct thread_data *)(ptr);
-  d_log("starting thread %p", td);
+  cpt_log("starting thread %p", td);
 
   td->kernel->thread = td;
   td->kernel->main();
   return NULL;
 }
 
-void kernel_comp::barrier() {
-  d_trace("barrier call %p", this);
+void shader::barrier() {
+  cpt_trace("barrier call %p", this);
   pthread_barrier_wait(this->thread->barrier);
-  d_trace("barrier release %p", this);
+  cpt_trace("barrier release %p", this);
 }
 
 struct kernel {
   unsigned int num_threads;
 
-  kernel(int32_t num_threads) { this->num_threads = (unsigned int)num_threads; }
+  char error_msg[1024];
+  int error_no;
 
-  ~kernel() {
-    // TODO: clean up threads etc. etc.
+  kernel(int32_t num_t) {
+    if (num_t < 1) {
+    }
+    this->num_threads = (unsigned int)num_threads;
   }
 
-  int ensure_alignments(cpt_data d) {
-    (void)d;
-#include "align.hpp"
-  }
+  ~kernel() {}
 
-  int dispatch(cpt_data d, int32_t nx, int32_t ny, int32_t nz) {
-    int erc = this->ensure_alignments(d);
-    if (erc)
-      return erc; // TODO: Move over the error structuring to C world so not
-                  // dependent on Go...
+private:
+  bool set_error(int no, const char *msg);
+  struct error_t error();
+  bool ensure_alignments(cpt_data d);
 
-    struct thread_data *threads;
-    threads = (struct thread_data *)malloc(sizeof(*threads) * _cpt_WG_SIZE_Z *
-                                           _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X);
-    pthread_barrier_t barrier;
+public:
+  struct error_t dispatch(cpt_data d, int32_t nx, int32_t ny, int32_t nz);
+};
 
-    uint32_t numx = (uint32_t)nx;
-    uint32_t numy = (uint32_t)ny;
-    uint32_t numz = (uint32_t)nz;
-    for (uint32_t gz = 0; gz < numz; ++gz) {
-      for (uint32_t gy = 0; gy < numy; ++gy) {
-        for (uint32_t gx = 0; gx < numx; ++gx) {
+bool kernel::set_error(int no, const char *msg) {
+  if (this->error_no != 0)
+    return false;
+  strncpy(&this->error_msg[0], msg, 1023);
+  this->error_no = no;
+  return false;
+}
 
-          int ercc = pthread_barrier_init(
-              &barrier, NULL, _cpt_WG_SIZE_Z * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X);
-          d_log("init %d %p", ercc, &barrier);
-          if(ercc)
-            return ercc + 150;
+struct error_t kernel::error() {
+  return (struct error_t){this->error_no, &this->error_msg[0]};
+}
 
-          auto sd = kernel_comp::create_shared_data();
+struct error_t kernel::dispatch(cpt_data d, int32_t nx, int32_t ny,
+                                int32_t nz) {
+  if (this->error_no)
+    return this->error();
+  if (!this->ensure_alignments(d))
+    return this->error();
 
+  struct thread_data *threads;
+  threads = (struct thread_data *)malloc(sizeof(*threads) * _cpt_WG_SIZE_Z *
+                                         _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X);
+  pthread_barrier_t barrier;
 
-          for (uint32_t lz = 0; lz < _cpt_WG_SIZE_Z; ++lz) {
-            for (uint32_t ly = 0; ly < _cpt_WG_SIZE_Y; ++ly) {
-              for (uint32_t lx = 0; lx < _cpt_WG_SIZE_X; ++lx) {
-                long index = lx + ly * _cpt_WG_SIZE_X +
-                             lz * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X;
-                d_verbose("in loop %d %ld",
-                        _cpt_WG_SIZE_Z * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X,
-                        index);
-                kernel_comp *k = new kernel_comp(); // TODO: re-use the
-                                                    // allocation across calls
-                                                    
-                // TODO: can we avoid all these calcs?
-                k->gl_NumWorkGroups.z = nz;
-                k->gl_NumWorkGroups.y = ny;
-                k->gl_NumWorkGroups.x = nx;
-                k->gl_WorkGroupID.z = gz;
-                k->gl_WorkGroupID.y = gy;
-                k->gl_WorkGroupID.x = gx;
-                k->gl_WorkGroupSize.z = _cpt_WG_SIZE_Z;
-                k->gl_WorkGroupSize.y = _cpt_WG_SIZE_Y;
-                k->gl_WorkGroupSize.x = _cpt_WG_SIZE_X;
-                k->gl_LocalInvocationID.z = lz;
-                k->gl_LocalInvocationID.y = ly;
-                k->gl_LocalInvocationID.x = lx;
-                k->gl_GlobalInvocationID = k->gl_WorkGroupID * make_uvec3(_cpt_WG_SIZE_X, _cpt_WG_SIZE_Y, _cpt_WG_SIZE_Z) + k->gl_LocalInvocationID;
-                k->gl_LocalInvocationIndex = lx + ly*_cpt_WG_SIZE_X + lz*_cpt_WG_SIZE_X*_cpt_WG_SIZE_Y;
-                
-                k->set_shared_data(sd);
-                int erno = k->set_data(d);
-                if (erno != 0) 
-                  return erno;
-        
-                threads[index].kernel = k;
-                threads[index].barrier = &barrier;
+  uint32_t numx = (uint32_t)nx;
+  uint32_t numy = (uint32_t)ny;
+  uint32_t numz = (uint32_t)nz;
+  for (uint32_t gz = 0; gz < numz; ++gz) {
+    for (uint32_t gy = 0; gy < numy; ++gy) {
+      for (uint32_t gx = 0; gx < numx; ++gx) {
 
-                // for each one, create a thread that we will use:
-                int errno;
-                d_verbose("about to creae");
-                errno = pthread_create(&threads[index].thread, NULL, thread_core,
-                                       (void *)&threads[index]);
-                d_verbose("thread create no %d", errno);
-                if (errno)
-                  return errno; // TODO: memory leas... (this entire functin...)
-                  
-              }
-            }
-          }
-
-          // wait for all the threads to finish and join them
-          for (uint32_t lz = 0; lz < _cpt_WG_SIZE_Z; ++lz) {
-            for (uint32_t ly = 0; ly < _cpt_WG_SIZE_Y; ++ly) {
-              for (uint32_t lx = 0; lx < _cpt_WG_SIZE_X; ++lx) {
-                long index = lx + ly * _cpt_WG_SIZE_X +
-                             lz * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X;
-                int s = pthread_join(threads[index].thread, NULL);
-                d_log("ERC %d", s);
-                if (s != 0)
-                  return s +1000;
-                  //return error("error joining threads: %d", s);
-                free(threads[index].kernel);
-              }
-            }
-          }
-
-          
-          kernel_comp::free_shared_data(sd);
-
-          // TODO: Free!
-          pthread_barrier_destroy(&barrier);
+        int ercc = pthread_barrier_init(
+            &barrier, NULL, _cpt_WG_SIZE_Z * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X);
+        cpt_log("init %d %p", ercc, &barrier);
+        if (ercc) {
+          this->set_error(ercc, "error creating thread barrier");
+          return this->error();
         }
+
+        auto sd = shader::create_shared_data();
+
+        for (uint32_t lz = 0; lz < _cpt_WG_SIZE_Z; ++lz) {
+          for (uint32_t ly = 0; ly < _cpt_WG_SIZE_Y; ++ly) {
+            for (uint32_t lx = 0; lx < _cpt_WG_SIZE_X; ++lx) {
+              long index = lx + ly * _cpt_WG_SIZE_X +
+                           lz * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X;
+              cpt_verbose("in loop %d %ld",
+                          _cpt_WG_SIZE_Z * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X,
+                          index);
+              shader *k = new shader(); // TODO: re-use the
+                                        // allocation across calls
+
+              // TODO: can we avoid all these calcs?
+              k->gl_NumWorkGroups.z = nz;
+              k->gl_NumWorkGroups.y = ny;
+              k->gl_NumWorkGroups.x = nx;
+              k->gl_WorkGroupID.z = gz;
+              k->gl_WorkGroupID.y = gy;
+              k->gl_WorkGroupID.x = gx;
+              k->gl_WorkGroupSize.z = _cpt_WG_SIZE_Z;
+              k->gl_WorkGroupSize.y = _cpt_WG_SIZE_Y;
+              k->gl_WorkGroupSize.x = _cpt_WG_SIZE_X;
+              k->gl_LocalInvocationID.z = lz;
+              k->gl_LocalInvocationID.y = ly;
+              k->gl_LocalInvocationID.x = lx;
+              k->gl_GlobalInvocationID =
+                  k->gl_WorkGroupID * make_uvec3(_cpt_WG_SIZE_X, _cpt_WG_SIZE_Y,
+                                                 _cpt_WG_SIZE_Z) +
+                  k->gl_LocalInvocationID;
+              k->gl_LocalInvocationIndex = lx + ly * _cpt_WG_SIZE_X +
+                                           lz * _cpt_WG_SIZE_X * _cpt_WG_SIZE_Y;
+
+              k->set_shared_data(sd);
+              k->set_data(d);
+
+              threads[index].kernel = k;
+              threads[index].barrier = &barrier;
+
+              // for each one, create a thread that we will use:
+              int no;
+              cpt_verbose("about to creae");
+              no = pthread_create(&threads[index].thread, NULL, thread_core,
+                                  (void *)&threads[index]);
+              cpt_verbose("thread create no %d", no);
+              if (no) {
+                this->set_error(no, "error creating threads");
+                return this->error();
+                // TODO: memory leas... (this entire functin...)
+              }
+            }
+          }
+        }
+
+        // wait for all the threads to finish and join them
+        for (uint32_t lz = 0; lz < _cpt_WG_SIZE_Z; ++lz) {
+          for (uint32_t ly = 0; ly < _cpt_WG_SIZE_Y; ++ly) {
+            for (uint32_t lx = 0; lx < _cpt_WG_SIZE_X; ++lx) {
+              long index = lx + ly * _cpt_WG_SIZE_X +
+                           lz * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X;
+              int s = pthread_join(threads[index].thread, NULL);
+              cpt_log("ERC %d", s);
+              if (s != 0) {
+                this->set_error(s, "error joining threads");
+                return this->error();
+              }
+              // return error("error joining threads: %d", s);
+              free(threads[index].kernel);
+            }
+          }
+        }
+
+        shader::free_shared_data(sd);
+
+        // TODO: Free!
+        pthread_barrier_destroy(&barrier);
       }
     }
-
-    free(threads);
-
-    return 0;
   }
-};
+
+  free(threads);
+
+  return this->error();
+}
+
+#include "align.hpp"

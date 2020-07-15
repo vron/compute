@@ -19,7 +19,7 @@ go run glbind/*.go
 # run the go file throug goimports
 goimports -w build/kernel.go
 # build the runtime to a static library
-(cd build && clang++ lib.cpp -shared -o ./shader.so -fPIC -Ofast -Wall -Wextra -std=c++17 -fno-exceptions -ffast-math -Wno-unused-function -fno-math-errno -Werror -lm) # TODO: enable the parameter again
+(cd build && clang++ lib.cpp -shared -o ./shader.so -fPIC -Ofast -Wall -Wextra -std=c++2a -fno-exceptions -ffast-math -Wno-unused-function -fno-math-errno -Werror -lm) # TODO: enable the parameter again
 #(cd build && clang++ lib.cpp -shared -o ./shader.so -fPIC -O0 -Wall -Wextra -std=c++17 -fno-exceptions -Wno-unused-function -lm) # TODO: enable the parameter again
 #ar rc build/shader.a build/lib.o
 # move out only the relevant files to a subdir
