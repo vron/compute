@@ -16,7 +16,7 @@ void *cpt_new_kernel(int32_t num_t) {
   return static_cast<void *>(k);
 }
 
-struct error_t cpt_dispatch_kernel(void *k, cpt_data d, int32_t x, int32_t y,
+struct cpt_error_t cpt_dispatch_kernel(void *k, cpt_data d, int32_t x, int32_t y,
                                    int32_t z) {
   cpt_log("dispatch %p %d %d %d", k, x, y, z);
   kernel *kt = static_cast<kernel *>(k);

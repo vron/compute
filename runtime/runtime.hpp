@@ -47,11 +47,11 @@ struct kernel {
 
 private:
   bool set_error(int no, const char *msg);
-  struct error_t error();
+  struct cpt_error_t error();
   bool ensure_alignments(cpt_data d);
 
 public:
-  struct error_t dispatch(cpt_data d, int32_t nx, int32_t ny, int32_t nz);
+  struct cpt_error_t dispatch(cpt_data d, int32_t nx, int32_t ny, int32_t nz);
 };
 
 bool kernel::set_error(int no, const char *msg) {
@@ -62,11 +62,11 @@ bool kernel::set_error(int no, const char *msg) {
   return false;
 }
 
-struct error_t kernel::error() {
-  return (struct error_t){this->error_no, &this->error_msg[0]};
+struct cpt_error_t kernel::error() {
+  return (struct cpt_error_t){this->error_no, &this->error_msg[0]};
 }
 
-struct error_t kernel::dispatch(cpt_data d, int32_t nx, int32_t ny,
+struct cpt_error_t kernel::dispatch(cpt_data d, int32_t nx, int32_t ny,
                                 int32_t nz) {
   if (this->error_no)
     return this->error();

@@ -27,7 +27,7 @@ func generateSharedH(inp Input) {
 #include "stdint.h"
 
 /*
-  error_t represents an error as reported from cpt_dispatch_kernel. The 
+  cpt_error_t represents an error as reported from cpt_dispatch_kernel. The 
   possible errors can mostly be classified as either user errors or underlying
   system errors. In case of underlying errors, such as insufficient resources,
   the .code field will be set to an error code from errno.h. In case of user
@@ -36,7 +36,7 @@ func generateSharedH(inp Input) {
   only accessible until the next call to cpt_dispatch_kernel or cpt_free_kernel
   for the same kernel reference.
 */
-struct error_t {
+struct cpt_error_t {
   int code;
   char* msg;
 };
@@ -85,13 +85,13 @@ void *cpt_new_kernel(int32_t num_t);
   using cpt_free_kernel. It is the callers responsibility to ensure that any
   data of non-fixed size in d is properly aligned as required by the kernel and
   of sufficient length for the number of work groups issued. Any error message
-  description returned in error_t.msg is only accessible until the next call to
+  description returned in cpt_error_t.msg is only accessible until the next call to
   cpt_dispatch_kernel or cpt_free_kernel for the same kernel reference k.
   cpt_dispatch_kernel is safe for concurrent use by multiple threads for
   different kernel references (k) but must not be called concurrently for the
   same k.
 */
-struct error_t cpt_dispatch_kernel(void *k, cpt_data d, int32_t x, int32_t y, int32_t z);
+struct cpt_error_t cpt_dispatch_kernel(void *k, cpt_data d, int32_t x, int32_t y, int32_t z);
 
 /*
   cpt_free_kernel must be called for any non-null kernel k created to avoid
