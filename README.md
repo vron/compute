@@ -48,7 +48,6 @@ TODO: Write once I have commited to a design
 # TODO
  - add test for and ensure no name clash with our classes...
  - Create referenceGo implementations of all benchmars
- - Clean up go pacage
  - Rewor api such that array of array instead of merging all the arrays when that is the case..
  - support multi-file shader with macros
  - Gain more performance but letting the compiler now we have ensured all the alignements
