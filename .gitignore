@@ -1,5 +1,5 @@
 data/**
 build/**
 *.DS_Store
-.vscode/*
+.vscode
 # ignore generated files in the main folder

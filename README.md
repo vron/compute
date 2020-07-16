@@ -52,3 +52,5 @@ TODO: Write once I have commited to a design
  - support multi-file shader with macros
  - Gain more performance but letting the compiler now we have ensured all the alignements
  - Document that all fields not of slices will be COPIED to not mess with cgo ( i.e  vec4[1000] is a bad idea perforamnce wise..)
+ - Add pathological test cases such as wg size 0 etc. etc.
+ - Set the NDEBUG flag to remove all those asserts..    
