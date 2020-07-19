@@ -37,16 +37,29 @@ public:
     int nt = no < this->num_thread ? no : num_thread;
     int si = 0;
     int e_each = (no + (nt - 1)) / nt;
+    for (int ti = 0; ti < nt; ti++) {
+      // TODO: we should be able to replace this loop with single expression?
+      int e = e_each;
+      if (e + si > no) {
+        e = no - si;
+      }
+      if (e < 1) {
+        nt = ti;
+        break;
+      }
+      si += e;
+    }
+    si = 0;
     sync.barrier.set_count(nt);
     for (int ti = 0; ti < nt; ti++) {
       int e = e_each;
       if (e + si > no) {
         e = no - si;
       }
+      assert(e > 0);
       sync.send_work(WorkPiece<T>(e, &threads[si]));
       si += e;
     }
-
     for (int ti = 0; ti < nt; ti++) {
       sync.wait_for_done();
     }

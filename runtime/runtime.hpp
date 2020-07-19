@@ -1,152 +1,128 @@
 #pragma once
 
-struct thread_data;
-
 #include "debug.hpp"
+#include "generated/shader.hpp"
+#include "routines/routines.hpp"
+#include "types/types.hpp"
 #include <cstring>
-#include <thread>
-#include "./types/types.hpp"
-#include "threads.hpp"
-#include "./generated/shader.hpp"
 
-struct thread_data {
-  pthread_barrier_t *barrier;
-  std::thread thread;
-  shader *kernel;
+#define WG_SIZE (_cpt_WG_SIZE_Z * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X)
+
+// TODO: Can we remove this one and move to just shader?
+class WorkGroupArg {
+public:
+  shader *shader;
+  WorkGroupArg(){};
+  WorkGroupArg(struct shader *s) : shader(s){};
 };
 
-void thread_core(struct thread_data *td) {
-  td->kernel->thread = td;
-  cpt_log("thread calling main %p", td);
-  td->kernel->main();
-  cpt_log("main called %p", td);
-  return;
+void thread_core(Invocation<WorkGroupArg> *th) {
+  auto td = th->get_argument();
+  td.shader->thread = th;
+  td.shader->main();
+  th->exit();
 }
 
-void shader::barrier() {
-  cpt_trace("barrier call %p", this->thread->barrier);
-  pthread_barrier_wait(this->thread->barrier);
-  cpt_trace("barrier release %p", this);
-}
+void shader::barrier() { 
+  this->thread->barrier();
+  }
 
-struct kernel {
-  unsigned int num_threads;
+class Kernel {
+  WorkGroup<WorkGroupArg> *wg;
+  Invocation<WorkGroupArg> *threads[WG_SIZE];
+  shader shaders[WG_SIZE];
+  shared_data_t *shared_data;
 
   char error_msg[1024];
   int error_no;
 
-  kernel(int32_t num_t) {
+public:
+  Kernel(int32_t num_t) {
     if (num_t < 1) {
       this->set_error(EINVAL, "must use at least 1 thread");
       return;
     }
-    this->num_threads = (unsigned int)num_threads;
+    // use 128B stack as default, this is likely much larger then ever needed
+    this->wg = new WorkGroup<WorkGroupArg>(static_cast<int>(num_t), 1024 * 128);
+    for (int i = 0; i < WG_SIZE; i++) {
+      threads[i] = wg->create_thread(); // TODO: Are we leaing threads here that
+                                        // we are not collecting?
+    }
+    shared_data = shader::create_shared_data();
   }
 
-  ~kernel() {}
+  ~Kernel() {
+    if (this->wg)
+      delete this->wg;
+    if (this->shared_data)
+      shader::free_shared_data(shared_data);
+  }
 
 private:
-  bool set_error(int no, const char *msg);
-  struct cpt_error_t error();
+  bool set_error(int no, const char *msg) {
+    if (this->error_no != 0)
+      return false;
+    strncpy(&this->error_msg[0], msg, 1023);
+    this->error_no = no;
+    return false;
+  };
+
+  struct cpt_error_t error() {
+    return (struct cpt_error_t){this->error_no, &this->error_msg[0]};
+  };
+
   bool ensure_alignments(cpt_data d);
+
+  void dispatch_wg(uvec3 wgID);
 
 public:
   struct cpt_error_t dispatch(cpt_data d, int32_t nx, int32_t ny, int32_t nz);
 };
 
-bool kernel::set_error(int no, const char *msg) {
-  if (this->error_no != 0)
-    return false;
-  strncpy(&this->error_msg[0], msg, 1023);
-  this->error_no = no;
-  return false;
+void Kernel::dispatch_wg(uvec3 wgID) {
+  int index = -1;
+  for (uint32_t lz = 0; lz < _cpt_WG_SIZE_Z; ++lz) {
+    for (uint32_t ly = 0; ly < _cpt_WG_SIZE_Y; ++ly) {
+      for (uint32_t lx = 0; lx < _cpt_WG_SIZE_X; ++lx) {
+        index++;
+        shader *s = &this->shaders[index];
+        s->gl_WorkGroupID = wgID;
+        s->gl_LocalInvocationID = make_uvec3(lx, ly, lz);
+        s->gl_GlobalInvocationID =
+            s->gl_WorkGroupID * s->gl_WorkGroupSize + s->gl_LocalInvocationID;
+        s->gl_LocalInvocationIndex =
+            lx + ly * _cpt_WG_SIZE_X +
+            lz * _cpt_WG_SIZE_X * _cpt_WG_SIZE_Y; // TODO: replace with index
+
+        s->thread = threads[index];
+        threads[index]->set_function(&thread_core, WorkGroupArg(&this->shaders[index]));
+      }
+    }
+  }
+  wg->run(WG_SIZE, this->threads);
 }
 
-struct cpt_error_t kernel::error() {
-  return (struct cpt_error_t){this->error_no, &this->error_msg[0]};
-}
-
-struct cpt_error_t kernel::dispatch(cpt_data d, int32_t nx, int32_t ny,
-                                int32_t nz) {
+struct cpt_error_t Kernel::dispatch(cpt_data d, int32_t nx, int32_t ny,
+                                    int32_t nz) {
   if (this->error_no)
     return this->error();
   if (!this->ensure_alignments(d))
     return this->error();
 
-  struct thread_data threads[_cpt_WG_SIZE_Z * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X];
-  pthread_barrier_t barrier;
+  // set up constants that will be same for all
+  uvec3 nwg = make_uvec3(nx, ny, nz);
+  uvec3 wgs = make_uvec3(_cpt_WG_SIZE_X, _cpt_WG_SIZE_Y, _cpt_WG_SIZE_Z);
+  for (int i = 0; i < WG_SIZE; i++) {
+    this->shaders[i].gl_NumWorkGroups = nwg;
+    this->shaders[i].gl_WorkGroupSize = wgs;
+    this->shaders[i].set_data(d);
+    this->shaders[i].set_shared_data(shared_data);
+  }
 
   for (uint32_t gz = 0; gz < (uint32_t)nz; ++gz) {
     for (uint32_t gy = 0; gy < (uint32_t)ny; ++gy) {
       for (uint32_t gx = 0; gx < (uint32_t)nx; ++gx) {
-
-  int ercc = pthread_barrier_init(
-      &barrier, NULL, _cpt_WG_SIZE_Z * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X);
-  cpt_log("init %d %p", ercc, &barrier);
-  if (ercc) {
-    this->set_error(ercc, "error creating thread barrier");
-    return this->error();
-  }
-        auto sd = shader::create_shared_data();
-
-        for (uint32_t lz = 0; lz < _cpt_WG_SIZE_Z; ++lz) {
-          for (uint32_t ly = 0; ly < _cpt_WG_SIZE_Y; ++ly) {
-            for (uint32_t lx = 0; lx < _cpt_WG_SIZE_X; ++lx) {
-              long index = lx + ly * _cpt_WG_SIZE_X +
-                           lz * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X;
-              shader *k = new shader();
-              
-              k->gl_NumWorkGroups = make_uvec3(nx, ny, nz);
-              k->gl_WorkGroupID = make_uvec3(gx, gy, gz);
-              k->gl_WorkGroupSize = make_uvec3(_cpt_WG_SIZE_X, _cpt_WG_SIZE_Y, _cpt_WG_SIZE_Z);
-              k->gl_LocalInvocationID = make_uvec3(lx, ly, lz);
-              k->gl_GlobalInvocationID =
-                  k->gl_WorkGroupID * k->gl_WorkGroupSize +
-                  k->gl_LocalInvocationID;
-              k->gl_LocalInvocationIndex = lx + ly * _cpt_WG_SIZE_X +
-                                           lz * _cpt_WG_SIZE_X * _cpt_WG_SIZE_Y;
-
-              k->set_shared_data(sd);
-              k->set_data(d);
-
-              threads[index].kernel = k;
-              threads[index].barrier = &barrier;
-
-              try {
-                cpt_verbose("about to create %p", &threads[index]);
-                threads[index].thread =
-                    std::thread(thread_core, &threads[index]);
-              } catch (...) {
-                cpt_log("ERROR CRATING thread");
-              }
-              cpt_verbose("thread created now");
-            }
-          }
-        }
-
-        cpt_verbose("loop done");
-        // wait for all the threads to finish and join them
-        for (uint32_t lz = 0; lz < _cpt_WG_SIZE_Z; ++lz) {
-          for (uint32_t ly = 0; ly < _cpt_WG_SIZE_Y; ++ly) {
-            for (uint32_t lx = 0; lx < _cpt_WG_SIZE_X; ++lx) {
-              long index = lx + ly * _cpt_WG_SIZE_X +
-                           lz * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X;
-
-              cpt_verbose("about to join %ld", index);
-              try {
-                threads[index].thread.join();
-              } catch (...) {
-                cpt_log("ERROR JOINING thread");
-              }
-              cpt_log("joined");
-              free(threads[index].kernel);
-            }
-          }
-        }
-        cpt_log("wg done");
-        shader::free_shared_data(sd);
-
-        pthread_barrier_destroy(&barrier);
+        dispatch_wg(make_uvec3(gx, gy, gz));
       }
     }
   }

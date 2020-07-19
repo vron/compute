@@ -1,8 +1,8 @@
 #pragma once
 #include "routines.hpp"
+#include <cassert>
 #include <cstdint>
 #include <cstdlib>
-#include <cassert>
 
 class InvocationState {
 public:

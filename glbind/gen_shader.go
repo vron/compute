@@ -18,14 +18,18 @@ func generateComp(inp Input) {
 	buf := bufio.NewWriter(f)
 	defer buf.Flush()
 
-	fmt.Fprintf(buf, `
+	fmt.Fprintf(buf, `#pragma once
+
+class WorkGroupArg;
+
 #define _cpt_WG_SIZE_X %v
 #define _cpt_WG_SIZE_Y %v
 #define _cpt_WG_SIZE_Z %v
 
 #include <cmath>
 #include "../types/types.hpp"
-#include "./usertypes.hpp"
+#include "usertypes.hpp"
+#include "../routines/routines.hpp"
 
 `, inp.Wg_size[0], inp.Wg_size[1], inp.Wg_size[2])
 
@@ -38,7 +42,7 @@ func generateComp(inp Input) {
 	buf.WriteString("\tuvec3 gl_LocalInvocationID;\n")
 	buf.WriteString("\tuvec3 gl_GlobalInvocationID;\n")
 	buf.WriteString("\tuint32_t gl_LocalInvocationIndex;\n")
-	buf.WriteString("\tthread_data *thread;\n\n")
+	buf.WriteString("\tInvocation<WorkGroupArg>  *thread;\n\n")
 
 	// write all the globals we should be able to access
 	for _, arg := range inp.Arguments {

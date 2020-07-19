@@ -17,8 +17,8 @@ func generateAlignH(inp Input) {
 	defer f.Close()
 	buf := bufio.NewWriter(f)
 	defer buf.Flush()
-
-	buf.WriteString("#include <cerrno>\n\nbool kernel::ensure_alignments(cpt_data d) {\n\t(void)d;\n")
+	buf.WriteString("#pragma once\n")
+	buf.WriteString("#include <cerrno>\n\nbool Kernel::ensure_alignments(cpt_data d) {\n\t(void)d;\n")
 
 	cSize := func(ty string, al int) {
 		msg := fmt.Sprintf("static check failed: sizeof(%v) != %v", ty, al)

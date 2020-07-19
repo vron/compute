@@ -117,7 +117,6 @@ cogs[(gl_WorkGroupID).x] = (my_res).cog;
 
 	static void free_shared_data(shared_data_t *sd) {
 		free(sd->shared_data);
-
 		delete sd;
 	}
 
