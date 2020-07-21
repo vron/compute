@@ -8,6 +8,7 @@ package kernel
 import (
 	"math"
 	"reflect"
+	"sync"
 	"testing"
 	"unsafe"
 )
@@ -177,6 +178,16 @@ func d(noi int) Data {
 	return d
 }
 
+func dgo(noi int) (tr [9]float32, ps []Polygon, cogs []float32) {
+	tr = [9]float32{1, 0, 0, 0, 1, 0, 2.0 / 3, 2.0 / 3, 1}
+	ps = make([]Polygon, noi*64)
+	cogs = make([]float32, noi*2)
+	for i := 0; i < noi*64; i++ {
+		ps[i] = p()
+	}
+	return
+}
+
 func p() Polygon {
 	p := Polygon{}
 	for i := 0; i < 64; i++ {
@@ -198,4 +209,99 @@ func unsafeToFloat(raw []byte) []float32 {
 	header.Cap /= 4
 	data := *(*[]float32)(unsafe.Pointer(&header))
 	return data
+}
+
+func BenchmarkTransTriRef(b *testing.B) {
+	noi := 128
+	tr, ps, cogs := dgo(noi)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		refimpl(tr, ps, cogs)
+	}
+	b.StopTimer()
+
+	// chec the cog's
+	for i := 0; i < noi; i++ {
+		cog := [2]float32{cogs[i*2], cogs[i*2+1]}
+		if math.Abs(float64(cog[0]-1)) > 1e-4 || math.Abs(float64(cog[1]-1)) > 1e-4 {
+			b.Error("bas cog data", i, cog)
+		}
+	}
+}
+
+func refimpl(tr [9]float32, ps []Polygon, cogs []float32) {
+	// simply do it in parts of 64
+	wg := sync.WaitGroup{}
+	si := 0
+	noe := 64
+	for i := 0; i < len(ps)/64; i++ {
+		ei := si + noe
+		wg.Add(1)
+		go func(tr [9]float32, ps []Polygon, cogs []float32) {
+			impl(tr, ps, cogs)
+			wg.Done()
+		}(tr, ps[si:ei], cogs[i*2:i*2+2])
+		si = ei
+	}
+	wg.Wait()
+}
+
+func impl(tr [9]float32, ps []Polygon, cogs []float32) {
+	if len(cogs) != 2 {
+		panic("should be")
+	}
+
+	area, x, y := float32(0), float32(0), float32(0)
+	for i := 0; i < 64; i++ {
+		a, b, c := cog_poly(ps[i], tr)
+		area += a
+		x += a * b
+		y += a * c
+	}
+	x /= area
+	y /= area
+
+	cogs[0] = x
+	cogs[1] = y
+}
+
+func area_tri(t Triangle) float32 {
+	a := (t.Vertices[2]-t.Vertices[0])*(t.Vertices[5]-t.Vertices[1]) - (t.Vertices[4]-t.Vertices[0])*(t.Vertices[3]-t.Vertices[1])
+	if a < 0.0 {
+		a *= -0.5
+	} else {
+		a *= 0.5
+	}
+	return a
+}
+
+func cog_tri(t Triangle) (float32, float32) {
+	return (t.Vertices[2] + t.Vertices[4] + t.Vertices[0]) / 3.0,
+		(t.Vertices[3] + t.Vertices[5] + t.Vertices[1]) / 3.0
+}
+
+func tri(t *Triangle, transform [9]float32) (area, x, y float32) {
+	for i := 0; i < 3; i++ {
+		t.Vertices[i*2], t.Vertices[i*2+1], _ = matmul(transform, t.Vertices[i*2], t.Vertices[i*2+1], 1.0)
+	}
+	area = area_tri(*t)
+	x, y = cog_tri(*t)
+	return
+}
+
+func matmul(m [9]float32, x, y, z float32) (float32, float32, float32) {
+	return m[0]*x + m[3]*y + m[6]*z, m[0+1]*x + m[3+1]*y + m[6+1]*z, m[0+1+1]*x + m[3+1+1]*y + m[6+1+1]*z
+}
+
+func cog_poly(p Polygon, t [9]float32) (area, x, y float32) {
+	for i := 0; i < 64; i++ {
+		a, b, c := tri(&p.Triangles[i], t)
+		area += a
+		x += b * a
+		y += c * a
+	}
+	x /= area
+	y /= area
+	return
 }

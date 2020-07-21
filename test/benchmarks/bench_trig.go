@@ -7,6 +7,8 @@ package kernel
 import (
 	"math"
 	"reflect"
+	"runtime"
+	"sync"
 	"testing"
 	"unsafe"
 )
@@ -91,12 +93,7 @@ func BenchmarkTrigRef(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		copy(dout, din)
-		for i := range dout {
-			dout[i] = float32(math.Sin(float64(dout[i])))
-			dout[i] = float32(math.Cos(float64(dout[i])))
-			dout[i] = float32(math.Tan(float64(dout[i])))
-		}
+		refImpl(dout, din)
 	}
 	b.StopTimer()
 
@@ -105,6 +102,35 @@ func BenchmarkTrigRef(b *testing.B) {
 			b.Error("bad value", i, dout[i])
 		}
 	}
+}
+
+func refImpl(dout, din []float32) {
+	nop := runtime.NumCPU()
+	wg := sync.WaitGroup{}
+	wg.Add(nop)
+	si := 0
+	noe := len(din) / nop
+	for i := 0; i < nop; i++ {
+		ei := si + noe
+		if i == nop-1 {
+			ei = len(dout)
+		}
+		go func(dout, din []float32) {
+			copy(dout, din)
+			for i := range dout {
+				dout[i] = float32(math.Sin(float64(dout[i])))
+			}
+			for i := range dout {
+				dout[i] = float32(math.Cos(float64(dout[i])))
+			}
+			for i := range dout {
+				dout[i] = float32(math.Tan(float64(dout[i])))
+			}
+			wg.Done()
+		}(dout[si:ei], din[si:ei])
+		si = ei
+	}
+	wg.Wait()
 }
 
 func floatToByte(raw []float32) []byte {

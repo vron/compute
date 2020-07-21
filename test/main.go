@@ -152,7 +152,7 @@ func runTest(p string) {
 			c := exec.Command("go", "test", "-run", "xxxxxx", "-benchtime", "2s", "-bench", ".")
 			c.Dir = filepath.Join(path, "build", "go")
 			c.Stderr = os.Stderr
-			c.Stdout = resultsOnly(os.Stdout)
+			c.Stdout = resultsOnly(os.Stdout) // TODO: this hides error output...
 			err := c.Run()
 			if err != nil {
 				log.Fatalln("bench failed", err)
