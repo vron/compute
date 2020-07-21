@@ -60,7 +60,7 @@ func BenchmarkTrig(b *testing.B) {
 	dout := make([]float32, 64*1024*24)
 
 	d := Data{Din: floatToByte(din), Dout: floatToByte(dout)}
-	k, err := New(-1)
+	k, err := New(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		b.Error(err)
 		b.FailNow()

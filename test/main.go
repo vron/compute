@@ -20,6 +20,7 @@ import (
 var (
 	fLocal    bool
 	fBench    bool
+	fCpu      string
 	once      sync.Once
 	imageName string
 )
@@ -27,6 +28,7 @@ var (
 func init() {
 	flag.BoolVar(&fLocal, "local", true, "run on local machine instead of container")
 	flag.BoolVar(&fBench, "bench", false, "run benchmars instead of tests")
+	flag.StringVar(&fCpu, "cpu", "", "number of cpus")
 	log.SetFlags(log.LstdFlags | log.Llongfile)
 }
 
@@ -149,7 +151,13 @@ func runTest(p string) {
 			}
 
 			// run the benchmar and log the output
-			c := exec.Command("go", "test", "-run", "xxxxxx", "-benchtime", "2s", "-bench", ".")
+			args := []string{
+				"test", "-run", "xxxxxx", "-benchtime", "2s", "-bench", ".",
+			}
+			if fCpu != "" {
+				args = append(args, "-cpu", fCpu)
+			}
+			c := exec.Command("go", args...)
 			c.Dir = filepath.Join(path, "build", "go")
 			c.Stderr = os.Stderr
 			c.Stdout = resultsOnly(os.Stdout) // TODO: this hides error output...

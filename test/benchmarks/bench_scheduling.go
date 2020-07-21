@@ -6,6 +6,7 @@ package kernel
 */
 import (
 	"reflect"
+	"runtime"
 	"testing"
 	"unsafe"
 )
@@ -49,7 +50,7 @@ void main() {
 func BenchmarkScheduling(b *testing.B) {
 	data := make([]int32, 64)
 	d := Data{Data: intToByte(data)}
-	k, err := New(-1)
+	k, err := New(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		b.Error(err)
 		b.FailNow()

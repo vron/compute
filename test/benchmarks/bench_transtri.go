@@ -8,6 +8,7 @@ package kernel
 import (
 	"math"
 	"reflect"
+	"runtime"
 	"sync"
 	"testing"
 	"unsafe"
@@ -115,7 +116,7 @@ func BenchmarkTransTri(b *testing.B) {
 	noi := 128
 	data := d(noi)
 
-	k, err := New(-1)
+	k, err := New(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		b.Error(err)
 		b.FailNow()
