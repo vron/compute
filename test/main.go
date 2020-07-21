@@ -71,11 +71,11 @@ func ensure(err error) {
 }
 
 func cleanBuild() {
-	c := exec.Command("./script/clean.sh")
+	c := exec.Command("go", "run", "script/clean.go")
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	ensure(c.Run())
-	ensure(os.MkdirAll("./build", 0777))
+	ensure(os.MkdirAll("build", 0777))
 }
 
 func buildImage() {
@@ -140,7 +140,7 @@ func runTest(p string) {
 		log.Fatalln("test failed")
 	} else {
 		// run local on this machine
-		c := exec.Command("./script/build.sh", "./build/test.comp")
+		c := exec.Command("go", "run", "script/build.go", "build/test.comp")
 		data, err := c.CombinedOutput()
 		if err == nil {
 			if !fBench {

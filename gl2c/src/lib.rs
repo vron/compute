@@ -1549,6 +1549,8 @@ pub fn translate(file: String) -> String {
         .read_to_string(&mut contents)
         .unwrap();
 
+    let contents = contents.replace("\r\n", "\n");
+
     let tu = syntax::TranslationUnit::parse(contents).unwrap();
     let mut state = State {
         body: Part::new(),

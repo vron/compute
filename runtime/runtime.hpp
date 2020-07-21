@@ -4,7 +4,6 @@
 #include "generated/shader.hpp"
 #include "routines/routines.hpp"
 #include "types/types.hpp"
-#include <cstring>
 
 #define WG_SIZE (_cpt_WG_SIZE_Z * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X)
 
@@ -62,7 +61,13 @@ private:
   bool set_error(int no, const char *msg) {
     if (this->error_no != 0)
       return false;
-    strncpy(&this->error_msg[0], msg, 1023);
+    // manuall string copy since conflicting deprecations etc. on platforms. we have a
+    // constant length so this should be safe.
+    for(int i = 0; i < 1023; i++) {
+      this->error_msg[i] =  msg[i];
+      if(msg[i] == 0)
+       break;
+    }
     this->error_no = no;
     return false;
   };

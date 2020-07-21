@@ -26,6 +26,7 @@ func generateGo(inp Input) {
 	buf.WriteString("package kernel" + "\n\n")
 	buf.WriteString(`// #cgo darwin LDFLAGS: -L${SRCDIR} -L. build/shader.so
 // #cgo linux LDFLAGS: -L${SRCDIR}/build -L. build/shader.so
+// #cgo windows LDFLAGS: -L. -lshader
 // #include "shared.h"
 import "C"
 
