@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -34,7 +33,7 @@ func main() {
 	}
 
 	ensure(os.MkdirAll("build/generated", 0777))
-	fmt.Println("GGG", SHADER)
+
 	ensure(run("glslangValidator", SHADER))
 
 	ensure(runf("gl2c", "cargo", "run", "-q", "--", "../"+SHADER, "../build/kernel.json"))
