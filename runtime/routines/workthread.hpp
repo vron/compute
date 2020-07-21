@@ -27,12 +27,13 @@ private:
         work.threads[i]->wt = this;
       }
 
-      // so now we actually need to run that stuff...
+      // note that as per the glsl compute specification we can reply on all invocations
+      // reaching the same barrier calls in the same order. If this is no ensured by the
+      // author we will get strange results here...
       do {
         for (int i = 0; i < work.no; i++) {
           this->resume_thread(work.threads[i]);
         }
-
         // barrier calls also beed to be sync:ed with those in other threads.
         sync->barrier.wait();
 

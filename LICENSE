@@ -1,6 +1,8 @@
 This project is dual-licensed under the UNLICENSE or
-the MIT license with the SPDX identifier, excepting where noted
-specifically in the source code tree:
+the MIT license, excepting where noted specifically in the source code tree.
+
+Note in particular that all code included in the generated library isunder the licensing
+above.
 
 SPDX-License-Identifier: Unlicense OR MIT
 

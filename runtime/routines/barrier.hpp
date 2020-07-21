@@ -2,6 +2,10 @@
 #include <condition_variable>
 #include <mutex>
 
+// a barrier which forces multiple threads to wait at that point until a pre-set
+// number of threads has reached the barrier. Once activated it is re-set and can
+// be used again.
+// Should be replaced by std:barrier once that is implemented in clang.
 class Barrier {
 private:
   std::mutex m;

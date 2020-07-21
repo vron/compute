@@ -4,6 +4,17 @@
   to be executed on a CPU as static code. The library is safe for threaded use
   as further specified below.
 */
+
+/*
+ In order to make the library useful on multiple platforms we define some support
+ macros that will optionally be used.
+*/
+#ifdef _WIN64
+#define exported_func __declspec(dllexport)
+#else
+#define exported_func
+#endif
+
 #include "errno.h"
 #include "stdint.h"
 
@@ -50,7 +61,7 @@ typedef struct {
   the next call to cpt_dispatch_kernel will return the error information.
   cpt_new_kernel is safe for concurrent use from multiple threads.
 */
-void *cpt_new_kernel(int32_t num_t);
+exported_func void *cpt_new_kernel(int32_t num_t);
 
 /*
   cpt_dispatch_kernel issues a calculation of the compute shader using x, y, z
@@ -65,11 +76,11 @@ void *cpt_new_kernel(int32_t num_t);
   different kernel references (k) but must not be called concurrently for the
   same k.
 */
-struct cpt_error_t cpt_dispatch_kernel(void *k, cpt_data d, int32_t x, int32_t y, int32_t z);
+exported_func struct cpt_error_t cpt_dispatch_kernel(void *k, cpt_data d, int32_t x, int32_t y, int32_t z);
 
 /*
   cpt_free_kernel must be called for any non-null kernel k created to avoid
   leaks. Note that any k for which cpt_free_kernel has been called is unsafe for
   any further use.
 */
-void cpt_free_kernel(void *k);
+exported_func void cpt_free_kernel(void *k);

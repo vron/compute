@@ -20,7 +20,7 @@ public:
     }
 
     this->stack_size = stack_size;
-    this->stack = malloc(stack_size); // TODO: this could fail
+    this->stack = malloc(stack_size);
     // TODO(vron): use guard page at end of stack to catch stack overflows
   }
 

@@ -1,34 +1,28 @@
 #pragma once
 
-#include "debug.hpp"
 #include "generated/shader.hpp"
 #include "routines/routines.hpp"
 #include "types/types.hpp"
 
 #define WG_SIZE (_cpt_WG_SIZE_Z * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X)
 
-// TODO: Can we remove this one and move to just shader?
-class WorkGroupArg {
-public:
-  shader *shader;
-  WorkGroupArg(){};
-  WorkGroupArg(struct shader *s) : shader(s){};
-};
-
-void thread_core(Invocation<WorkGroupArg> *th) {
+// wrapper for the main function in the computational shader
+void thread_core(Invocation<struct shader*> *th) {
   auto td = th->get_argument();
-  td.shader->thread = th;
-  td.shader->main();
+  td->invocation = th;
+  td->main();
   th->exit();
 }
 
+// the shader type generated from the compiled glsl shader has a barrier call,
+// we need to forward that to the barrier call in the 
 void shader::barrier() { 
-  this->thread->barrier();
-  }
+  this->invocation->barrier();
+}
 
 class Kernel {
-  WorkGroup<WorkGroupArg> *wg;
-  Invocation<WorkGroupArg> *threads[WG_SIZE];
+  WorkGroup<struct shader*> *wg;
+  Invocation<struct shader*> *threads[WG_SIZE];
   shader shaders[WG_SIZE];
   shared_data_t *shared_data;
 
@@ -42,10 +36,9 @@ public:
       return;
     }
     // use 128B stack as default, this is likely much larger then ever needed
-    this->wg = new WorkGroup<WorkGroupArg>(static_cast<int>(num_t), 1024 * 128);
+    this->wg = new WorkGroup<struct shader*>(static_cast<int>(num_t), 1024 * 128);
     for (int i = 0; i < WG_SIZE; i++) {
-      threads[i] = wg->create_thread(); // TODO: Are we leaing threads here that
-                                        // we are not collecting?
+      threads[i] = wg->create_thread();
     }
     shared_data = shader::create_shared_data();
   }
@@ -55,13 +48,16 @@ public:
       delete this->wg;
     if (this->shared_data)
       shader::free_shared_data(shared_data);
+    for (int i = 0; i < WG_SIZE; i++) {
+      delete threads[i];
+    }
   }
 
 private:
   bool set_error(int no, const char *msg) {
     if (this->error_no != 0)
       return false;
-    // manuall string copy since conflicting deprecations etc. on platforms. we have a
+    // manual string copy since conflicting deprecations etc. on platforms. we have a
     // constant length so this should be safe.
     for(int i = 0; i < 1023; i++) {
       this->error_msg[i] =  msg[i];
@@ -99,8 +95,8 @@ void Kernel::dispatch_wg(uvec3 wgID) {
             lx + ly * _cpt_WG_SIZE_X +
             lz * _cpt_WG_SIZE_X * _cpt_WG_SIZE_Y; // TODO: replace with index
 
-        s->thread = threads[index];
-        threads[index]->set_function(&thread_core, WorkGroupArg(&this->shaders[index]));
+        s->invocation = threads[index];
+        threads[index]->set_function(&thread_core, &this->shaders[index]);
       }
     }
   }

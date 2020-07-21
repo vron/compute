@@ -1,6 +1,7 @@
+#pragma once
 #include <cerrno>
 
-bool kernel::ensure_alignments(cpt_data d) {
+bool Kernel::ensure_alignments(cpt_data d) {
 	(void)d;
 	if(sizeof(Bool) != 4) { return this->set_error(EINVAL, "static check failed: sizeof(Bool) != 4"); };
 	if(alignof(Bool) != 4) { return this->set_error(EINVAL, "static check failed: alignof(Bool) != 4"); };
@@ -24,6 +25,8 @@ bool kernel::ensure_alignments(cpt_data d) {
 	if(alignof(mat3) != 16) { return this->set_error(EINVAL, "static check failed: alignof(mat3) != 16"); };
 	if(sizeof(mat4) != 64) { return this->set_error(EINVAL, "static check failed: sizeof(mat4) != 64"); };
 	if(alignof(mat4) != 16) { return this->set_error(EINVAL, "static check failed: alignof(mat4) != 16"); };
+	if(sizeof(vec2) != 8) { return this->set_error(EINVAL, "static check failed: sizeof(vec2) != 8"); };
+	if(alignof(vec2) != 8) { return this->set_error(EINVAL, "static check failed: alignof(vec2) != 8"); };
 	if(sizeof(triangle) != 24) { return this->set_error(EINVAL, "static check failed: sizeof(triangle) != 24"); };
 	if(alignof(triangle) != 8) { return this->set_error(EINVAL, "static check failed: alignof(triangle) != 8"); };
 	if(sizeof(polygon) != 1536) { return this->set_error(EINVAL, "static check failed: sizeof(polygon) != 1536"); };
@@ -36,8 +39,6 @@ bool kernel::ensure_alignments(cpt_data d) {
 	if(alignof(uvec3) != 16) { return this->set_error(EINVAL, "static check failed: alignof(uvec3) != 16"); };
 	if(sizeof(uvec4) != 16) { return this->set_error(EINVAL, "static check failed: sizeof(uvec4) != 16"); };
 	if(alignof(uvec4) != 16) { return this->set_error(EINVAL, "static check failed: alignof(uvec4) != 16"); };
-	if(sizeof(vec2) != 8) { return this->set_error(EINVAL, "static check failed: sizeof(vec2) != 8"); };
-	if(alignof(vec2) != 8) { return this->set_error(EINVAL, "static check failed: alignof(vec2) != 8"); };
 	if(sizeof(vec3) != 16) { return this->set_error(EINVAL, "static check failed: sizeof(vec3) != 16"); };
 	if(alignof(vec3) != 16) { return this->set_error(EINVAL, "static check failed: alignof(vec3) != 16"); };
 	if(sizeof(vec4) != 16) { return this->set_error(EINVAL, "static check failed: sizeof(vec4) != 16"); };

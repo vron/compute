@@ -1,8 +1,5 @@
 #pragma once
 
-// TODO: investigate false sharing and thread locations (i thin we should use 64
-// byte separation all over the place...)
-
 #include "routines.hpp"
 #include <condition_variable>
 #include <mutex>

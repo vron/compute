@@ -1,3 +1,4 @@
+#pragma once
 
 #define _cpt_WG_SIZE_X 64
 #define _cpt_WG_SIZE_Y 1
@@ -5,7 +6,8 @@
 
 #include <cmath>
 #include "../types/types.hpp"
-#include "./usertypes.hpp"
+#include "usertypes.hpp"
+#include "../routines/routines.hpp"
 
 class  shared_data_t {
 public:
@@ -20,7 +22,7 @@ struct shader {
 	uvec3 gl_LocalInvocationID;
 	uvec3 gl_GlobalInvocationID;
 	uint32_t gl_LocalInvocationIndex;
-	thread_data *thread;
+	Invocation<struct shader*>  *invocation;
 
 	mat3 transform;
 	polygon* polygons;
@@ -117,6 +119,7 @@ cogs[(gl_WorkGroupID).x] = (my_res).cog;
 
 	static void free_shared_data(shared_data_t *sd) {
 		free(sd->shared_data);
+
 		delete sd;
 	}
 

@@ -64,8 +64,7 @@ func (ct CType) GetSize() int {
 		size *= ct.ArrayLen
 	}
 	if ct.IsSlice {
-		panic("getsize")
-		return 8 // TODO: This will brea on non-64 bit platforms!
+		panic("getsize") // TODO: This will brea on non-64 bit platforms!
 	}
 	return size
 }

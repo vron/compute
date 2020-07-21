@@ -20,8 +20,6 @@ func generateComp(inp Input) {
 
 	fmt.Fprintf(buf, `#pragma once
 
-class WorkGroupArg;
-
 #define _cpt_WG_SIZE_X %v
 #define _cpt_WG_SIZE_Y %v
 #define _cpt_WG_SIZE_Z %v
@@ -42,7 +40,7 @@ class WorkGroupArg;
 	buf.WriteString("\tuvec3 gl_LocalInvocationID;\n")
 	buf.WriteString("\tuvec3 gl_GlobalInvocationID;\n")
 	buf.WriteString("\tuint32_t gl_LocalInvocationIndex;\n")
-	buf.WriteString("\tInvocation<WorkGroupArg>  *thread;\n\n")
+	buf.WriteString("\tInvocation<struct shader*>  *invocation;\n\n")
 
 	// write all the globals we should be able to access
 	for _, arg := range inp.Arguments {

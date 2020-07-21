@@ -5,19 +5,39 @@ jobs:
     name: Test code
     strategy:
       matrix:
-        platform: [ubuntu-20.04]
+        platform: [ubuntu-20.04, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: Install required packages
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+      
+      - name: Install glslang-tools (WINDOWS)
+        run: |
+          pip install wget
+          python -m wget https://github.com/KhronosGroup/glslang/releases/download/master-tot/glslang-master-windows-x64-Release.zip
+          7z e glslang-master-windows-x64-Release.zip
+          dir
+          echo "::add-path::$(pwd)/glslang-master-windows-x64-Release/bin"
+        if: runner.os == 'Windows'
+
+      - name: Install required packages (LINUX)
         run : sudo apt-get update && sudo apt-get install build-essential glslang-tools clang cargo rustc git
         if: runner.os == 'Linux'
 
-      - name: Install goimports
-        run : go get golang.org/x/tools/cmd/goimports && sudo cp ~/go/bin/goimports /usr/bin && sudo chmod 777 /usr/bin/goimports
-        if: runner.os == 'Linux'
+      - name: Install required packages (WINDOWS)
+        run: |
+          choco install -y llvm
+          echo "::add-path::C:/Program Files/LLVM/bin"
+        if: runner.os == 'Windows'
 
-      - name: Checkout code
-        uses: actions/checkout@v2
-        
+      - name: Install goimports
+        run : go get golang.org/x/tools/cmd/goimports
+
+      - name: Set env
+        run: echo "::add-path::$(go env GOPATH)/bin"
+
+      - name: Set env
+        run: echo $PATH
+
       - name: run the test-suit
         run: go run test/main.go -local
