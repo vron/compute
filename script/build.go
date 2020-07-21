@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -33,7 +34,7 @@ func main() {
 	}
 
 	ensure(os.MkdirAll("build/generated", 0777))
-
+	fmt.Println("GGG", SHADER)
 	ensure(run("glslangValidator", SHADER))
 
 	ensure(runf("gl2c", "cargo", "run", "-q", "--", "../"+SHADER, "../build/kernel.json"))
@@ -71,8 +72,12 @@ func main() {
 
 	ensure(os.MkdirAll("build/go/build", 0777))
 
-	cp("build/test_test.go", "build/go/test_test.go")
-	cp("build/util_test.go", "build/go/util_test.go")
+	if ex("build/test_test.go") {
+		cp("build/test_test.go", "build/go/test_test.go")
+	}
+	if ex("build/util_test.go") {
+		cp("build/util_test.go", "build/go/util_test.go")
+	}
 	cp("build/kernel.go", "build/go/kernel.go")
 
 	if runtime.GOOS == "windows" {
@@ -95,6 +100,18 @@ func runf(path, m string, args ...string) error {
 	c.Stderr = os.Stderr
 	c.Stdout = os.Stdout
 	return c.Run()
+}
+
+func ex(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	ensure(err)
+	panic("cannot be reached")
 }
 
 func cp(from, to string) {

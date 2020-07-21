@@ -1,5 +1,7 @@
 # Compute - static runtime for GLSL compute shaders
 
+![Test](https://github.com/vron/compute/workflows/Test/badge.svg)
+
 This project compiles (a subset of) Vulkan/OpenGL compute shaders to a C library
 with low dependencies that can be called from any language allowing C bindings.
 Additionally such a Go package is generated, providing a clean interface while using
@@ -13,22 +15,22 @@ prioritized.
 
 # Get started
 Due to the complicated dependencies the tool is easiest to use through docker. If you
-want to run and use it locally please refer to the source code.
+want to run and use it locally please refer to the source code. Note that Windows and macOS
+are supported, but not through the docker file.
 
 To simply use this project to generate a go package from a compute shader such that you
 can import and use it directly, the easiest is to run it through docker (only supported
-on Linux for now, see TODO below):
+on Linux for now, see TODO below, also the image is huge - could probably be slimmed down
+a bit, but ut must include llvm, rust, go etc. etc.):
 
-1. Ensure you have a a folder 'data' in your current directory and your shader in that dir.
+1. Cd into the directory with your shader file (*.comp file)
 
-    docker run -v $(pwd)/data:/data vron/compute your_shader.comp
+2. Run:
+
+    docker run -v $(pwd):/data vron/compute your_shader.comp
 
 Unless you get errors (try with a simple shader first) you should have both the C and
-the go library generated inside the data folder.
-
- - kernel.go
- - kernel.a
- - shared.h
+the go library wrapper generated.
 
 For an example of using compute to generate a package, including how to call it
 please see github.com/vron/computeexample
