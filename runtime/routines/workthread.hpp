@@ -34,7 +34,9 @@ private:
         for (int i = 0; i < work.no; i++) {
           this->resume_thread(work.threads[i]);
         }
-        // barrier calls also beed to be sync:ed with those in other threads.
+        if (work.threads[0]->finished)
+          break;
+        // barrier calls also need to be sync:ed with those in other threads.
         sync->barrier.wait();
 
       } while (!work.threads[0]->finished);
