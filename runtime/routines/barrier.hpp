@@ -22,6 +22,7 @@ public:
   }
 
   void wait() {
+    //return;
     uint32_t val = __atomic_fetch_sub(&count, 1, __ATOMIC_SEQ_CST);
     uint32_t my_count = val & 0xFFFF;
     uint32_t my_gen = val & 0xFFFF0000;
@@ -35,9 +36,15 @@ public:
     } else {
       uint32_t wait_gen;
       do {
+        #if defined(__x86_64__)
+        __asm__ ("rep nop"); // TODO: move this into arch package?
+        #else
+        #error "unsupported architecture"
+        #endif
         uint32_t wait_val = __atomic_load_n(&this->count, __ATOMIC_SEQ_CST);
         wait_gen = wait_val & 0xFFFF0000;
       } while(wait_gen == my_gen);
+
       return;
     }
   };
