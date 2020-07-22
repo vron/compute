@@ -74,13 +74,13 @@ private:
 
   bool ensure_alignments(cpt_data d);
 
-  void dispatch_wg(uvec3 wgID);
+  void dispatch_wg(uvec3 wgID, bool pause);
 
 public:
   struct cpt_error_t dispatch(cpt_data d, int32_t nx, int32_t ny, int32_t nz);
 };
 
-void Kernel::dispatch_wg(uvec3 wgID) {
+void Kernel::dispatch_wg(uvec3 wgID, bool pause) {
   int index = -1;
   for (uint32_t lz = 0; lz < _cpt_WG_SIZE_Z; ++lz) {
     for (uint32_t ly = 0; ly < _cpt_WG_SIZE_Y; ++ly) {
@@ -91,16 +91,14 @@ void Kernel::dispatch_wg(uvec3 wgID) {
         s->gl_LocalInvocationID = make_uvec3(lx, ly, lz);
         s->gl_GlobalInvocationID =
             s->gl_WorkGroupID * s->gl_WorkGroupSize + s->gl_LocalInvocationID;
-        s->gl_LocalInvocationIndex =
-            lx + ly * _cpt_WG_SIZE_X +
-            lz * _cpt_WG_SIZE_X * _cpt_WG_SIZE_Y; // TODO: replace with index
+        s->gl_LocalInvocationIndex = index;
 
         s->invocation = threads[index];
-        threads[index]->set_function(&thread_core, &this->shaders[index]);
+        threads[index]->set_function(&thread_core, &this->shaders[index]); // TODO: Why does this one need to be in here and not only done once outside global loop?
       }
     }
   }
-  wg->run(WG_SIZE, this->threads);
+  wg->run(WG_SIZE, this->threads, pause);
 }
 
 struct cpt_error_t Kernel::dispatch(cpt_data d, int32_t nx, int32_t ny,
@@ -123,7 +121,7 @@ struct cpt_error_t Kernel::dispatch(cpt_data d, int32_t nx, int32_t ny,
   for (uint32_t gz = 0; gz < (uint32_t)nz; ++gz) {
     for (uint32_t gy = 0; gy < (uint32_t)ny; ++gy) {
       for (uint32_t gx = 0; gx < (uint32_t)nx; ++gx) {
-        dispatch_wg(make_uvec3(gx, gy, gz));
+        dispatch_wg(make_uvec3(gx, gy, gz), gz == (uint32_t)nz-1 && gy == (uint32_t)ny-1 && gx == (uint32_t)nx-1);
       }
     }
   }
