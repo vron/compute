@@ -73,6 +73,25 @@ func TestShader3(t *testing.T) {
 		}
 	}
 }
+
+func TestShaderTwice(t *testing.T) {
+	// create the input data
+	din := make([]byte, 2*2*2*4)
+	dout := make([]byte, 2*2*2*4)
+	d := Data{Din: din, Dout: dout}
+	ensureRun(t, -1, d, 2, 1, 1)
+
+	out := unsafeToFloat(dout)
+	if len(out) != 8 {
+		t.Error("bad conversion")
+	}
+	for i := range out {
+		if out[i] != 200 {
+			t.Error(i, out[i], "!=", 200.0)
+		}
+	}
+}
+
 func unsafeToFloat(raw []byte) []float32 {
 	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
 	header.Len /= 4
