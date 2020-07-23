@@ -42,7 +42,7 @@ import (
 	"encoding/binary"
 )
 
-type kernel struct {
+type Kernel struct {
 	k unsafe.Pointer
 	dead bool
 }
@@ -66,11 +66,11 @@ type kernel struct {
 	}
 	buf.WriteString(`}
 
-// New creates a kernel using at most numCPU+1 threads. If numCPU <= 0 the
+// New creates a Kernel using at most numCPU+1 threads. If numCPU <= 0 the
 // number of threads to use will be calculated automatically. All kernels
-// must be explicitly freed using kernel.Free to avoid memory leaks.
-func New(numCPU int) (k *kernel, err error) {
-	k = &kernel{}
+// must be explicitly freed using Kernel.Free to avoid memory leaks.
+func New(numCPU int) (k *Kernel, err error) {
+	k = &Kernel{}
 	if numCPU <= 0 {
 		numCPU = runtime.NumCPU()+2
 	}
@@ -82,13 +82,13 @@ func New(numCPU int) (k *kernel, err error) {
 	return k, nil
 }
 
-// Dispatch a kernel calculation of the specified size. The caller must ensure
+// Dispatch a Kernel calculation of the specified size. The caller must ensure
 // that the data provided in bind matches the kernel's assumptions and that any
 // []byte field represents properly aligned data. Not data in bind must
 // be accessed (read or write) until Dispatch returns.
-func (k *kernel) Dispatch(bind Data, numGroupsX, numGroupsY, numGroupsZ int) error {
+func (k *Kernel) Dispatch(bind Data, numGroupsX, numGroupsY, numGroupsZ int) error {
 	if k.dead {
-		panic("cannot use a kernel where Free() has been called")
+		panic("cannot use a Kernel where Free() has been called")
 	}
 	cbind := C.cpt_data{
 `)
@@ -118,14 +118,14 @@ func (k *kernel) Dispatch(bind Data, numGroupsX, numGroupsY, numGroupsZ int) err
 	return errors.New(strconv.Itoa(int(errno.code)) + ": " + errstr)
 }
 
-// Free dealocates any data allocated by the underlying kernel. Note that
+// Free dealocates any data allocated by the underlying Kernel. Note that
 // a kernel on which Free has been called can no longer be used.
-func (k *kernel) Free() {
+func (k *Kernel) Free() {
 	freeKernel(k)
 }
 
 
-func freeKernel(k *kernel) {
+func freeKernel(k *Kernel) {
 	if k.dead {
 		return
 	}
