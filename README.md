@@ -52,7 +52,7 @@ which runs all the tests and follow what it does (see also scripts/build.go).
  - Implement support for ARM64, Android, Linux, Windows
  - Create referenceGo implementations of all benchmarks
  - Add test cases for name collisions and fix the naming...
- - Support multi-file shader with macros
+ - Support multi-file shader with macros - use https://github.com/facebookresearch/CParser/blob/master/cparser.lua ?
  - Gain more performance but letting the compiler now we have ensured all the alignments
  - Add pathological test cases such as wg size 0 etc. etc.
  - Set the NDEBUG flag to remove all those asserts..    
