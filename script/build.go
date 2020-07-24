@@ -60,10 +60,10 @@ func main() {
 	asm := ""
 	outf := ""
 	if runtime.GOOS == "windows" {
-		asm = "routines/arch/amd64_win.S"
+		asm = "co/arch/amd64_win.S"
 		outf = "shader.dll"
 	} else {
-		asm = "routines/arch/amd64_nix.S"
+		asm = "co/arch/amd64_nix.S"
 		outf = "./shader.so"
 		cargs = append(cargs, "-fPIC")
 	}

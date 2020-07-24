@@ -1,6 +1,5 @@
 .text
 
-
 .globl amd64_nix_switch
 #ifndef __APPLE__
 .type  amd64_nix_switch, @function
@@ -8,8 +7,8 @@
 .intel_syntax noprefix
 /*
     TODO: Do we need the ctrl words? (fnstcw,stmxcsr,fldcwldmxcsr) 
-    // https://en.wikipedia.org/wiki/X86_calling_conventions
-    // https://aaronbloomfield.github.io/pdr/book/x86-64bit-ccc-chapter.pdf
+    https://en.wikipedia.org/wiki/X86_calling_conventions
+    https://aaronbloomfield.github.io/pdr/book/x86-64bit-ccc-chapter.pdf
 */
 amd64_nix_switch:
     /* Store the current context */

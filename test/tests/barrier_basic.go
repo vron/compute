@@ -43,7 +43,7 @@ func TestShader(t *testing.T) {
 	din := make([]byte, 2*2*2*4)
 	dout := make([]byte, 2*2*2*4)
 	d := Data{Din: din, Dout: dout}
-	ensureRun(t, -1, d, 1, 1, 1)
+	ensureRun(t, 1, d, 1, 1, 1)
 
 	out := unsafeToFloat(dout)
 	if len(out) != 8 {
@@ -62,24 +62,6 @@ func TestShader3(t *testing.T) {
 	dout := make([]byte, 2*2*2*4)
 	d := Data{Din: din, Dout: dout}
 	ensureRun(t, 3, d, 1, 1, 1)
-
-	out := unsafeToFloat(dout)
-	if len(out) != 8 {
-		t.Error("bad conversion")
-	}
-	for i := range out {
-		if out[i] != 200 {
-			t.Error(i, out[i], "!=", 200.0)
-		}
-	}
-}
-
-func TestShaderTwice(t *testing.T) {
-	// create the input data
-	din := make([]byte, 2*2*2*4)
-	dout := make([]byte, 2*2*2*4)
-	d := Data{Din: din, Dout: dout}
-	ensureRun(t, -1, d, 2, 1, 1)
 
 	out := unsafeToFloat(dout)
 	if len(out) != 8 {

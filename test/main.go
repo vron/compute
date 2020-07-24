@@ -20,6 +20,7 @@ import (
 var (
 	fLocal    bool
 	fBench    bool
+	fV        bool
 	fCpu      string
 	once      sync.Once
 	imageName string
@@ -28,6 +29,7 @@ var (
 func init() {
 	flag.BoolVar(&fLocal, "local", true, "run on local machine instead of container")
 	flag.BoolVar(&fBench, "bench", false, "run benchmars instead of tests")
+	flag.BoolVar(&fV, "v", false, "verbose")
 	flag.StringVar(&fCpu, "cpu", "", "number of cpus")
 	log.SetFlags(log.LstdFlags | log.Llongfile)
 }
@@ -156,6 +158,9 @@ func runTest(p string) {
 			}
 			if fCpu != "" {
 				args = append(args, "-cpu", fCpu)
+			}
+			if fV {
+				args = append(args, "-v")
 			}
 			c := exec.Command("go", args...)
 			c.Dir = filepath.Join(path, "build", "go")

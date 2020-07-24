@@ -69,12 +69,12 @@ type Kernel struct {
 // New creates a Kernel using at most numCPU+1 threads. If numCPU <= 0 the
 // number of threads to use will be calculated automatically. All kernels
 // must be explicitly freed using Kernel.Free to avoid memory leaks.
-func New(numCPU int) (k *Kernel, err error) {
+  func New(numCPU int, stackSize int) (k *Kernel, err error) {
 	k = &Kernel{}
 	if numCPU <= 0 {
 		numCPU = runtime.NumCPU()+2
 	}
-	k.k = C.cpt_new_kernel(C.int(numCPU));
+	k.k = C.cpt_new_kernel(C.int32_t(numCPU), C.int32_t(stackSize));
 	if k.k == nil {
 		return nil, errors.New("failed to create kernel structure")
 	}

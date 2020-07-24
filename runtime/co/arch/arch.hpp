@@ -2,9 +2,13 @@
 #include <cstddef>
 #include <cstdint>
 
+// TODO: can we make these not macros but constants etc. such that we do not
+// polute the global scope?
+
 #if defined(__x86_64__) && (defined(__linux__) || defined(__APPLE__))
 // System V AMD64 ABI here
 #define ARCH_reg_state 10
+#define ARCH_cache_line_size 64
 // the first argument to the func should also be set to to, here implicitly
 // handled since we call this function with it..
 void ARCH_switch(void *to, void *from) __asm__("amd64_nix_switch");
@@ -22,6 +26,7 @@ void ARCH_set_register_state(void **registers, void *fp, void *stack,
 
 #elif (defined(_WIN64) && defined(__x86_64__))
 #define ARCH_reg_state 32
+#define ARCH_cache_line_size 64
 void ARCH_switch(void *to, void *from) __asm__("amd64_win_switch");
 void ARCH_set_register_state(void **registers, void *fp, void *stack,
                              size_t stack_size) {

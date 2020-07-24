@@ -9,13 +9,13 @@ extern "C" {
 
 extern "C" {
 
-void *cpt_new_kernel(int32_t num_t) {
-  Kernel *k = new Kernel(num_t);
+void *cpt_new_kernel(int32_t num_t, int32_t stack_size) {
+  Kernel *k = new Kernel(num_t, stack_size);
   return static_cast<void *>(k);
 }
 
-struct cpt_error_t cpt_dispatch_kernel(void *k, cpt_data d, int32_t x, int32_t y,
-                                   int32_t z) {
+struct cpt_error_t cpt_dispatch_kernel(void *k, cpt_data d, int32_t x,
+                                       int32_t y, int32_t z) {
   Kernel *kt = static_cast<Kernel *>(k);
   return kt->dispatch(d, x, y, z);
 }

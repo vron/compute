@@ -23,13 +23,14 @@ func generateComp(inp Input) {
 #define _cpt_WG_SIZE_X %v
 #define _cpt_WG_SIZE_Y %v
 #define _cpt_WG_SIZE_Z %v
+#define _cpt_WG_SIZE %v
 
 #include <cmath>
 #include "../types/types.hpp"
 #include "usertypes.hpp"
-#include "../routines/routines.hpp"
+#include "../co/routines.hpp"
 
-`, inp.Wg_size[0], inp.Wg_size[1], inp.Wg_size[2])
+`, inp.Wg_size[0], inp.Wg_size[1], inp.Wg_size[2], inp.Wg_size[0]*inp.Wg_size[1]*inp.Wg_size[2])
 
 	writeSharedStruct(buf, inp)
 
@@ -40,7 +41,7 @@ func generateComp(inp Input) {
 	buf.WriteString("\tuvec3 gl_LocalInvocationID;\n")
 	buf.WriteString("\tuvec3 gl_GlobalInvocationID;\n")
 	buf.WriteString("\tuint32_t gl_LocalInvocationIndex;\n")
-	buf.WriteString("\tInvocation<struct shader*>  *invocation;\n\n")
+	buf.WriteString("\tco::Routine<struct shader*>  *invocation;\n\n")
 
 	// write all the globals we should be able to access
 	for _, arg := range inp.Arguments {

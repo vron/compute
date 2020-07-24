@@ -1,9 +1,5 @@
 package kernel
 
-/*
-	A wide and small shader in order to benchmar scheduling stuff, such as
-	launching wg's, syning etc.
-*/
 import (
 	"reflect"
 	"runtime"
@@ -21,7 +17,7 @@ layout(std430) buffer Out {
 };
 
 void main() {
-	uint index = gl_LocalInvocationIndex + 4*4*4*(gl_WorkGroupID .x + gl_WorkGroupID .y*8 + gl_WorkGroupID .z*8*8);
+	uint index = gl_LocalInvocationIndex;
 	int value = int(index);
 
 	if (index % 2 == 0) {
@@ -30,7 +26,7 @@ void main() {
 
 	barrier();
 
-	if (index < 1024*1024) {
+	if (index < 1024) {
 		value = 1;
 	}
 	for (int i = 0; i < 4; i++) {
@@ -47,32 +43,36 @@ void main() {
 }
 `
 
-func BenchmarkScheduling(b *testing.B) {
-	data := make([]int32, 64*8*8*8*1024)
+func TestShader(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		test(t)
+	}
+}
+
+func test(t *testing.T) {
+	data := make([]int32, 64)
 	d := Data{Data: intToByte(data)}
 	k, err := New(runtime.GOMAXPROCS(-1), 1024*1024)
 	if err != nil {
-		b.Error(err)
-		b.FailNow()
+		t.Error(err)
+		t.FailNow()
 	}
 	defer k.Free()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		err := k.Dispatch(d, 8, 8, 8) // TODO: 8,8,8
+	for i := 0; i < 10; i++ {
+		err := k.Dispatch(d, 1, 1, 1) // TODO: 8,8,8
 		if err != nil {
-			b.Error(err)
+			t.Error(err)
 		}
 	}
-	b.StopTimer()
 
-	for i := range data[:64] {
+	for i := range data {
 		ex := int32(1)
 		if i%2 == 0 {
 			ex = 5
 		}
 		if data[i] != ex {
-			b.Error(i, "expected value: ", ex, "got", data[i])
+			t.Error(i, "expected value: ", ex, "got", data[i])
 		}
 	}
 }

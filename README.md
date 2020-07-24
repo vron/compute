@@ -55,7 +55,7 @@ which runs all the tests and follow what it does (see also scripts/build.go).
  - Support multi-file shader with macros - use https://github.com/facebookresearch/CParser/blob/master/cparser.lua ?
  - Gain more performance but letting the compiler now we have ensured all the alignments
  - Add pathological test cases such as wg size 0 etc. etc.
- - Set the NDEBUG flag to remove all those asserts..    
  - Document the alignment for []byte in both the C header and the go package.
  - Check if we have any problems with false sharing
  - When running the tests, first pre-build the headers to save time on each?
+ - Variable sized stacs to avoid that as configuration? https://llvm.org/docs/SegmentedStacks.html

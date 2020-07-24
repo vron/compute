@@ -85,9 +85,11 @@ struct cpt_error_t {
   If there is insufficient memory available to create a new kernel 0 is
   returned. For all other possible errors a kernel reference is returned and
   the next call to cpt_dispatch_kernel will return the error information.
-  cpt_new_kernel is safe for concurrent use from multiple threads.
+  cpt_new_kernel is safe for concurrent use from multiple threads. The stack size
+  that each shader invocation should have access to can be specified in the last
+  argument. If negative a default value of 16kB will be used.
 */
-exported_func void *cpt_new_kernel(int32_t num_t);
+exported_func void *cpt_new_kernel(int32_t num_t, int32_t stack_size);
 
 /*
   cpt_dispatch_kernel issues a calculation of the compute shader using x, y, z

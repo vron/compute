@@ -116,7 +116,7 @@ func BenchmarkTransTri(b *testing.B) {
 	noi := 128
 	data := d(noi)
 
-	k, err := New(runtime.GOMAXPROCS(-1))
+	k, err := New(runtime.GOMAXPROCS(-1), 1024*1024)
 	if err != nil {
 		b.Error(err)
 		b.FailNow()

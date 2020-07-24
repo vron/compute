@@ -11,7 +11,7 @@ func ensureRun(t *testing.T, nt int, d Data, numx, numy, numz int) {
 }
 
 func run(t *testing.T, nt int, d Data, numx, numy, numz int) error {
-	k, err := New(nt)
+	k, err := New(nt, -1)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()

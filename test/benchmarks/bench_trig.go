@@ -60,7 +60,7 @@ func BenchmarkTrig(b *testing.B) {
 	dout := make([]float32, 64*1024*24)
 
 	d := Data{Din: floatToByte(din), Dout: floatToByte(dout)}
-	k, err := New(runtime.GOMAXPROCS(-1))
+	k, err := New(runtime.GOMAXPROCS(-1), 1024*1024)
 	if err != nil {
 		b.Error(err)
 		b.FailNow()
@@ -105,7 +105,7 @@ func BenchmarkTrigRef(b *testing.B) {
 }
 
 func refImpl(dout, din []float32) {
-	nop := runtime.NumCPU()
+	nop := runtime.NumCPU() * 4
 	wg := sync.WaitGroup{}
 	wg.Add(nop)
 	si := 0
