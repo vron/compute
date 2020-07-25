@@ -34,6 +34,13 @@ func main() {
 
 	ensure(os.MkdirAll("build/generated", 0777))
 
+	// first use lcpp to concatenate all into one file by processing the
+	// includes such that we have single file we can build.
+	ts := filepath.Base(SHADER)
+	ts = filepath.Join("build", ts+".inc.comp")
+	ensure(run("lua", "script/lcpp.lua", SHADER, "-I.", "-o", ts))
+	SHADER = ts
+
 	ensure(run("glslangValidator", SHADER))
 
 	ensure(runf("gl2c", "cargo", "run", "-q", "--", "../"+SHADER, "../build/kernel.json"))
