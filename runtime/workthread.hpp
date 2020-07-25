@@ -40,7 +40,6 @@ public:
   };
 
   ~WorkThread() {
-    shader::free_shared_data(shared_data);
     this->t.join();
   };
 
@@ -49,7 +48,7 @@ private:
     shared_data = shader::create_shared_data();
     uvec3 wgs = make_uvec3(_cpt_WG_SIZE_X, _cpt_WG_SIZE_Y, _cpt_WG_SIZE_Z);
     for (int i = _cpt_WG_SIZE - 1; i >= 0; i--) {
-      this->routines[i] = (new co::Routine<T>(
+      routines[i] = (new co::Routine<T>(
           stack_size,
           &state)); // TODO: THis will obviously leak memory? or will it?
 
@@ -59,6 +58,13 @@ private:
       shaders[i].set_shared_data(shared_data);
       shaders[i].gl_WorkGroupSize =
           wgs; // Todo, this one is constant - move it into the actual shader...
+    }
+  }
+
+  void finish() {
+    shader::free_shared_data(shared_data);
+    for (int i = _cpt_WG_SIZE - 1; i >= 0; i--) {
+          delete routines[i];
     }
   }
 
@@ -112,5 +118,6 @@ private:
 
       wg->done();
     }
+    finish();
   }
 };
