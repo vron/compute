@@ -38,6 +38,7 @@ please see github.com/vron/computeexample
 # Known limitations
  - Currently only works on x64
  - Several built in glsl functions missing
+ - Atomics do not function on vector components - use an array for this
 
 # Development get-started
 There has not been time to write a detailed explanation, but the best starting point to understand
