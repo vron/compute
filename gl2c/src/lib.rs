@@ -343,7 +343,7 @@ pub fn visit_struct_field(s: &mut State, field: &syntax::StructFieldSpecifier) -
     let mut identifiers = field.identifiers.0.iter();
     let identifier = identifiers.next().unwrap();
 
-    let arrno = match visit_arrayed_identifier(s, identifier) {
+    let arrno = match visit_arrayed_identifier(s, identifier, false) {
         None => vec!(),
         Some(v) => vec!(v),
     };
@@ -378,8 +378,12 @@ pub fn visit_array_spec(s: &mut State, a: &syntax::ArraySpecifier) -> Option<i32
     }
 }
 
-pub fn visit_arrayed_identifier(s: &mut State, a: &syntax::ArrayedIdentifier) -> Option<i32> {
-    let _ = write!(s, "{}", a.ident);
+pub fn visit_arrayed_identifier(s: &mut State, a: &syntax::ArrayedIdentifier, is_ref:bool) -> Option<i32> {
+    if is_ref {
+        let _ = write!(s, " (& {})", a.ident);
+    } else {
+        let _ = write!(s, "{}", a.ident);
+    }
 
     if let Some(ref arr_spec) = a.array_spec {
         return visit_array_spec(s, arr_spec);
@@ -426,6 +430,29 @@ pub fn visit_type_qualifier(s: &mut State, q: &syntax::TypeQualifier) {
     }
 }
 
+pub fn visit_type_qualifier_func(s: &mut State, q: &syntax::TypeQualifier) -> bool {
+    let mut qualifiers = q.qualifiers.0.iter();
+    let first = qualifiers.next().unwrap();
+
+    let r = match first {
+        syntax::TypeQualifierSpec::Storage(ref ss) => vis_ref(s, &ss),
+        syntax::TypeQualifierSpec::Layout(_) => panic!("{}", "no in a func?"),
+        syntax::TypeQualifierSpec::Precision(_) => panic!("{}", "no in a func?"),
+        syntax::TypeQualifierSpec::Interpolation(_) => panic!("{}", "no in a func?"),
+        syntax::TypeQualifierSpec::Invariant => panic!("{}", "no in a func?"),
+        syntax::TypeQualifierSpec::Precise => panic!("{}", "no in a func?"),
+    };
+
+
+    for _qual_spec in qualifiers {
+        panic!("{}", "cannot have more then one in a func?");
+        //let _ = write!(s, "{}", " ");
+        //visit_type_qualifier_spec(s, qual_spec)
+    }
+
+    r
+}
+
 pub fn visit_type_qualifier_spec(s: &mut State, q: &syntax::TypeQualifierSpec) {
     match *q {
         syntax::TypeQualifierSpec::Storage(ref ss) => visit_storage_qualifier(s, &ss),
@@ -438,6 +465,15 @@ pub fn visit_type_qualifier_spec(s: &mut State, q: &syntax::TypeQualifierSpec) {
         syntax::TypeQualifierSpec::Precise => {
             let _ = write!(s, "{}", "precise");
         }
+    }
+}
+
+pub fn vis_ref(_s: &mut State, q: &syntax::StorageQualifier)  -> bool{
+    match *q {
+        syntax::StorageQualifier::InOut => true,
+        syntax::StorageQualifier::In => false,
+        syntax::StorageQualifier::Out => true,
+        _ => false,
     }
 }
 
@@ -1142,28 +1178,29 @@ pub fn visit_function_parameter_declaration(
 ) {
     match *p {
         syntax::FunctionParameterDeclaration::Named(ref qual, ref fpd) => {
+            let mut is_ref = false;
             if let Some(ref q) = *qual {
-                visit_type_qualifier(s, q);
+                is_ref = visit_type_qualifier_func(s, q);
                 let _ = write!(s, "{}", " ");
             }
 
-            visit_function_parameter_declarator(s, fpd);
+            visit_function_parameter_declarator(s, fpd, is_ref);
         }
         syntax::FunctionParameterDeclaration::Unnamed(ref qual, ref ty) => {
+             // TODO: Do we need to add the references here to as above in functions?
             if let Some(ref q) = *qual {
-                visit_type_qualifier(s, q);
+                visit_type_qualifier_func(s, q);
                 let _ = write!(s, "{}", " ");
             }
-
             visit_type_specifier(s, ty);
         }
     }
 }
 
-pub fn visit_function_parameter_declarator(s: &mut State, p: &syntax::FunctionParameterDeclarator) {
+pub fn visit_function_parameter_declarator(s: &mut State, p: &syntax::FunctionParameterDeclarator, is_ref: bool) {
     visit_type_specifier(s, &p.ty);
     let _ = write!(s, "{}", " ");
-    visit_arrayed_identifier(s, &p.ident);
+    visit_arrayed_identifier(s, &p.ident, is_ref);
 }
 
 pub fn visit_init_declarator_list(s: &mut State, i: &syntax::InitDeclaratorList) {
@@ -1194,7 +1231,7 @@ pub fn visit_single_declaration(s: &mut State, d: &syntax::SingleDeclaration) {
 }
 
 pub fn visit_single_declaration_no_type(s: &mut State, d: &syntax::SingleDeclarationNoType) {
-    visit_arrayed_identifier(s, &d.ident);
+    visit_arrayed_identifier(s, &d.ident, false);
 
     if let Some(ref initializer) = d.initializer {
         let _ = write!(s, "{}", " = ");
@@ -1244,7 +1281,7 @@ pub fn visit_block(s: &mut State, b: &syntax::Block) {
     //let _ = write!(s, "{}", "}");
 
     if let Some(ref ident) = b.identifier {
-        visit_arrayed_identifier(s, ident);
+        visit_arrayed_identifier(s, ident, false);
     }
     s.pop_output();
 }
