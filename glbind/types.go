@@ -15,8 +15,8 @@ func parseTypeInfo(inp Input) {
 	createBasicBuiltinTypes()
 	createComplexBuiltinTypes()
 	// create the user defined struct types
-	for _, str := range inp.Structs {
-		recurseCreateStructTypes(inp, str)
+	for i, str := range inp.Structs {
+		recurseCreateStructTypes(i+1, inp, str)
 	}
 	types.calculateAlignments()
 	findApiExportedTypes(inp)
@@ -29,10 +29,11 @@ type Types struct {
 
 // A Type represents the GLSL type as parsed from the shader code
 type Type struct {
-	Name     string // the name as refered to it in GLSL
-	apiType  bool   // true if the type is used in the api and should be exported
-	userType bool   // type created in glsl
-	cType    *CType
+	Name         string // the name as refered to it in GLSL
+	apiType      bool   // true if the type is used in the api and should be exported
+	userType     bool   // type created in glsl
+	cType        *CType
+	userStructId int
 }
 
 // A CType represents the type defined in shared.h that will translate
@@ -351,13 +352,14 @@ func maybeCreateArrayType(ty string, noels []int) *CType {
 	return &bt
 }
 
-func recurseCreateStructTypes(inp Input, str InputStruct) {
+func recurseCreateStructTypes(i int, inp Input, str InputStruct) {
 	if _, o := types.types[str.Name]; o {
 		return
 	}
 	st := Type{
-		Name:     str.Name,
-		userType: true,
+		Name:         str.Name,
+		userType:     true,
+		userStructId: i,
 	}
 	ct := CType{
 		ty:     &st,
@@ -366,13 +368,7 @@ func recurseCreateStructTypes(inp Input, str InputStruct) {
 	}
 	for _, f := range str.Fields {
 		if _, o := types.types[f.Ty]; !o {
-			for _, s := range inp.Structs {
-				if s.Name == f.Ty {
-					recurseCreateStructTypes(inp, s)
-					break
-				}
-			}
-			panic("user struct refered to unspecified type: " + f.Ty)
+			panic("structs in input must be defined in dependicy order")
 		}
 		cf := CField{
 			Name: f.Name,

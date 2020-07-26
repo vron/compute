@@ -7,13 +7,16 @@ func less(ts []*Type) func(i, j int) bool {
 		// it should be sorted before...
 		ti, tj := ts[i], ts[j]
 
+		if ti.userStructId > 0 && tj.userStructId > 0 {
+			return ti.userStructId < tj.userStructId
+		}
+
 		if dependsOn(ti.cType, tj) {
 			return false
 		}
 		if dependsOn(tj.cType, ti) {
 			return true
 		}
-
 		return ts[i].Name < ts[j].Name
 	}
 }
