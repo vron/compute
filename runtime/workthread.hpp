@@ -25,17 +25,17 @@ public:
   int generation;
 
   co::Routine<T> *routines[_cpt_WG_SIZE]; // tODO: non pointers?
+  shared_data_t shared_data;
   shader shaders[_cpt_WG_SIZE]; // TODO: can we somehow remove the need for one
                                 // object per invocation? a lot of vectors eat
                                 // space here... At least eep it on the
                                 // invocation's stac?
-  shared_data_t *shared_data;
 
 public:
   WorkThread(WorkQueue<WorkPiece> *queue, WaitGroup<int32_t> *wg,
              int stack_size)
       : state(co::State(0)), queue(queue), wg(wg), stack_size(stack_size),
-        generation(0) {
+        generation(0), shaders{_cpt_REPEAT_WG_SIZE(shader(&shared_data))} {
     this->t = std::thread(&WorkThread::run, this);
   };
 
@@ -45,7 +45,6 @@ public:
 
 private:
   void setup() {
-    shared_data = shader::create_shared_data();
     uvec3 wgs = make_uvec3(_cpt_WG_SIZE_X, _cpt_WG_SIZE_Y, _cpt_WG_SIZE_Z);
     for (int i = _cpt_WG_SIZE - 1; i >= 0; i--) {
       routines[i] = (new co::Routine<T>(
@@ -55,14 +54,12 @@ private:
       // malloc is behaving strangely!
 
       shaders[i].invocation = routines[i];
-      shaders[i].set_shared_data(shared_data);
       shaders[i].gl_WorkGroupSize =
           wgs; // Todo, this one is constant - move it into the actual shader...
     }
   }
 
   void finish() {
-    shader::free_shared_data(shared_data);
     for (int i = _cpt_WG_SIZE - 1; i >= 0; i--) {
           delete routines[i];
     }

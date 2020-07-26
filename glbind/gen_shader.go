@@ -32,6 +32,13 @@ func generateComp(inp Input) {
 
 `, inp.Wg_size[0], inp.Wg_size[1], inp.Wg_size[2], inp.Wg_size[0]*inp.Wg_size[1]*inp.Wg_size[2])
 
+	// ugly hac to manage array initialization of the shaders
+	buf.WriteString("#define _cpt_REPEAT_WG_SIZE(x) x")
+	for i := 1; i < inp.Wg_size[0]*inp.Wg_size[1]*inp.Wg_size[2]; i++ {
+		buf.WriteString(", x")
+	}
+	buf.WriteString("\n")
+
 	writeSharedStruct(buf, inp)
 
 	buf.WriteString("struct shader {\n")
@@ -51,12 +58,42 @@ func generateComp(inp Input) {
 
 	// also write all the shared variabels we should be able to access
 	for _, arg := range inp.Shared {
-		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, []int{-1})} // TODO: chec this, we always do array here to use pointer
-		fmt.Fprintf(buf, cf.CxxFieldString()+"\n")
+		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, arg.Arrno)}
+		fmt.Fprintf(buf, cf.CxxFieldStringRef()+"\n")
 	}
 
+	buf.WriteString(`
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+`)
+	buf.WriteString("\tshader(shared_data_t *sd) ")
+	if len(inp.Shared) > 0 {
+		buf.WriteString(": ")
+		for i, arg := range inp.Shared {
+			fmt.Fprintf(buf, "%v(sd->%v)", arg.Name, arg.Name)
+			if i != len(inp.Shared)-1 {
+				buf.WriteString(", ")
+			}
+		}
+	}
+	buf.WriteString("{};\n")
+
+	// copy constructor is used for array initialization
 	buf.WriteString("\n")
-	buf.WriteString("\tshader() {};\n")
+	buf.WriteString("\tshader(const shader& org) ")
+	if len(inp.Shared) > 0 {
+		buf.WriteString(": ")
+		for i, arg := range inp.Shared {
+			fmt.Fprintf(buf, "%v(org.%v)", arg.Name, arg.Name)
+			if i != len(inp.Shared)-1 {
+				buf.WriteString(", ")
+			}
+		}
+	}
+	buf.WriteString(`{};
+#pragma clang diagnostic pop
+`)
+
 	buf.WriteString("\n")
 
 	buf.WriteString(inp.Body)
@@ -74,40 +111,7 @@ func generateComp(inp Input) {
 	void barrier();
 `)
 
-	// Generate a function for allocating and de-allocating shared data, and one for binding it to
-	// a class instance.
-	// TODO: handle allocation errors...
 	buf.WriteString(`
-	static shared_data_t* create_shared_data() {
-		shared_data_t *sd = new shared_data_t();
-		`)
-	// allocate each of the shared buffers we need
-	for _, arg := range inp.Shared {
-		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, arg.Arrno)}
-		fmt.Fprintf(buf, "sd->%v = (%v*)malloc(%v*sizeof(%v));\n", arg.Name, cf.Ty.ty.Name, cf.Ty.ArrayLen, cf.Ty.ty.Name)
-	}
-	buf.WriteString(`
-		return sd;
-	}
-
-	static void free_shared_data(shared_data_t *sd) {
-		`)
-	for _, arg := range inp.Shared {
-		fmt.Fprintf(buf, "free(sd->%v);\n", arg.Name)
-	}
-	buf.WriteString(`
-		delete sd;
-	}
-
-	void set_shared_data(shared_data_t *sd) {
-		(void)sd;
-		`)
-
-	for _, arg := range inp.Shared {
-		fmt.Fprintf(buf, "this->%v = sd->%v;\n", arg.Name, arg.Name)
-	}
-	buf.WriteString(`
-	}
 };
 `)
 }
@@ -115,7 +119,7 @@ func generateComp(inp Input) {
 func writeSharedStruct(buf io.Writer, inp Input) {
 	fmt.Fprintf(buf, "class  shared_data_t {\npublic:\n")
 	for _, arg := range inp.Shared {
-		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, []int{-1})}
+		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, arg.Arrno)}
 		fmt.Fprintf(buf, cf.CxxFieldString()+"\n")
 	}
 	fmt.Fprintf(buf, "} ;\n\n")

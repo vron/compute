@@ -54,7 +54,7 @@ func main() {
 		if len(s.Arrno) == 0 {
 			// This is since we need to access it shared - maybe we can replace it by using
 			// c++ references instead of pointers and thusly achieve what we want?
-			panic("thus far we only support shared arrays")
+			//panic("thus far we only support shared arrays")
 		}
 	}
 

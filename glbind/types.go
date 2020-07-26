@@ -192,6 +192,22 @@ func (cf CField) CxxFieldString() string {
 	return s + ";"
 }
 
+func (cf CField) CxxFieldStringRef() string {
+	if cf.Ty.IsSlice {
+		// there are no built-in types with arbitrary length so this is fine
+		return fmt.Sprintf("\t%v* (&%v);\n", cf.Ty.ty.Name, cf.Name)
+	}
+	s := "\t" + cf.Ty.ty.Name + "(& " + cf.Name + ")"
+
+	// NoElem here is in C world, e.g. a vec has a length, so what we want
+	// to chec is if the length is equal to the one for the defined type or
+	// not
+	if ll := cf.CxxArrayLen(); ll > 0 {
+		s += fmt.Sprintf("[%v]", ll)
+	}
+	return s + ";"
+}
+
 func (cf CField) GoName() string {
 	return strings.Title(cf.Name)
 }
