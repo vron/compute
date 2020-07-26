@@ -37,8 +37,9 @@ func main() {
 	// first use lcpp to concatenate all into one file by processing the
 	// includes such that we have single file we can build.
 	ts := filepath.Base(SHADER)
+	path := filepath.Dir(SHADER)
 	ts = filepath.Join("build", ts+".inc.comp")
-	ensure(run("lua", "script/lcpp.lua", SHADER, "-I.", "-o", ts))
+	ensure(run("lua", "script/lcpp.lua", SHADER, "-I"+path, "-o", ts))
 	SHADER = ts
 
 	ensure(run("glslangValidator", SHADER))

@@ -1364,7 +1364,7 @@ processDirectives = function(options, macros, lines, ...)
       ["defmacro"] = doDefmacro, ["defrecursivemacro"] = doDefmacro,
       ["endmacro"] = doError,
       ["include"] = doInclude, ["include_next"] = doInclude,
-      ["version"] = doIgnore,
+      ["version"] = doIgnore, ["extension"] = doIgnore,
    }
    -- process current line
    processLine = function(okElif)
