@@ -60,6 +60,10 @@ func main() {
 		"-Wextra",
 		"-Werror",
 		"-Wno-unused-function",
+		"-Wuninitialized",
+		"-pedantic-errors",
+		"-Wmost",
+		"-Wno-extra-semi",
 
 		"-Ofast",
 		"-ffast-math",

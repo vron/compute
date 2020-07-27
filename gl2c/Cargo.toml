@@ -10,3 +10,6 @@ glsl = "4.0"
 serde = "0.9"
 serde_json = "0.9"
 serde_derive = "0.9"
+
+[patch.crates-io]
+glsl = { path = "/Users/vron/Downloads/glsl/glsl" }

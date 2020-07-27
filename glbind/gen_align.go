@@ -48,7 +48,7 @@ func generateAlignH(inp Input) {
 }
 
 func recChecAlignment(buf *bufio.Writer, inp Input, cf CField, head string) {
-	if cf.Ty.IsSlice {
+	if cf.Ty.isSlice() {
 		// this is a slice, will be provided as pointer so chec it
 		ai := cf.Ty.Size
 		msg := fmt.Sprintf("the argument %v provided was not aligned to a %v byte boundary as required", head+cf.Name, ai.ByteAlignment)

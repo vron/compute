@@ -373,43 +373,43 @@ func generateUserStructs(buf *bufio.Writer, inp Input) {
 
 		// write a constructor to allow function-style initialization
 		//notused(vec3 ac[3], Bool bb, float cc) : aa{ac[0], ac[1], ac[2]}, bb(bb), cc(cc) {};
-
-		fmt.Fprintf(buf, "\t%v(", s.Name)
-		for i, f := range s.CType().Fields {
-			// TODO: Must we allow type cases here to?
-			arl := f.CxxArrayLen()
-			ex := ""
-			if arl > 0 {
-				ex += fmt.Sprintf("[%v]", arl)
-			}
-			strt := ""
-			if len(f.Ty.Fields) > 0 {
-				strt = " struct "
-			}
-			fmt.Fprintf(buf, "%v%v %v"+ex, strt, f.Ty.ty.Name, f.Name)
-			if i != len(s.CType().Fields)-1 {
-				buf.WriteString(", ")
-			}
-		}
-		buf.WriteString(") : ")
-		for i, f := range s.CType().Fields {
-			arl := f.CxxArrayLen()
-			if arl > 0 {
-				fmt.Fprintf(buf, "%v{", f.Name)
-				fmt.Fprintf(buf, "%v[0]", f.Name)
-				for j := 1; j < arl; j++ {
-					fmt.Fprintf(buf, ", %v[%v]", f.Name, j)
+		/*
+			fmt.Fprintf(buf, "\t%v(", s.Name)
+			for i, f := range s.CType().Fields {
+				// TODO: Must we allow type cases here to?
+				arl := f.CxxArrayLen()
+				ex := ""
+				if arl > 0 {
+					ex += fmt.Sprintf("[%v]", arl)
 				}
-				fmt.Fprintf(buf, "}")
-			} else {
-				fmt.Fprintf(buf, "%v(%v)", f.Name, f.Name)
+				strt := ""
+				if len(f.Ty.Fields) > 0 {
+					strt = " struct "
+				}
+				fmt.Fprintf(buf, "%v%v %v"+ex, strt, f.Ty.ty.Name, f.Name)
+				if i != len(s.CType().Fields)-1 {
+					buf.WriteString(", ")
+				}
 			}
-			if i != len(s.CType().Fields)-1 {
-				buf.WriteString(", ")
+			buf.WriteString(") : ")
+			for i, f := range s.CType().Fields {
+				arl := f.CxxArrayLen()
+				if arl > 0 {
+					fmt.Fprintf(buf, "%v{", f.Name)
+					fmt.Fprintf(buf, "%v[0]", f.Name)
+					for j := 1; j < arl; j++ {
+						fmt.Fprintf(buf, ", %v[%v]", f.Name, j)
+					}
+					fmt.Fprintf(buf, "}")
+				} else {
+					fmt.Fprintf(buf, "%v(%v)", f.Name, f.Name)
+				}
+				if i != len(s.CType().Fields)-1 {
+					buf.WriteString(", ")
+				}
 			}
-		}
-		fmt.Fprintf(buf, " {};\n")
-
+			fmt.Fprintf(buf, " {};\n")
+		*/
 		buf.WriteString("};\n\n")
 	}
 
@@ -436,55 +436,85 @@ func bVec(size int) func(InputArgument) string {
 */
 
 func (cf CField) CxxBinding(buf io.Writer) {
-	if cf.Ty.IsSlice {
+	if cf.Ty.isSlice() {
 		// slice type, the incomeing is *void and we assume everyhting is layed out, assign!
 		fmt.Fprintf(buf, "\tme->%v = (%v*)d.%v;\n", cf.Name, cf.Ty.ty.Name, cf.Name)
 		return
 	}
-	if cf.Ty.ArrayLen == 0 && (len(cf.Ty.Fields) > 0 || cf.Ty.ty.Name == "mat2" || cf.Ty.ty.Name == "mat3" || cf.Ty.ty.Name == "mat4") {
+	if cf.Ty.ArraySize() == 0 && (len(cf.Ty.Fields) > 0 || cf.Ty.ty.Name == "mat2" || cf.Ty.ty.Name == "mat3" || cf.Ty.ty.Name == "mat4") {
 		// this is a struct, assign each one of them, this must be done recursively!
 		fmt.Fprintf(buf, "\tfrom_api(&(me->%v), d.%v);\n", cf.Name, cf.Name)
 		return
 	}
-	if cf.Ty.ArrayLen == 0 {
+	if cf.Ty.ArraySize() == 0 {
 		fmt.Fprintf(buf, "\tme->%v = d.%v;\n", cf.Name, cf.Name)
 		return
 	}
 
-	// this is a matrix, for now handle it specifically until we figure out a way
-
+	printArrayBinding(buf, cf, cf.Ty, []int{})
 	// so it is an array of stuff, do the same for each once of the elements, but as a temp hac
 	// chec for the underlying type to set from that if needed
-	arrlen := cf.CxxArrayLen()
-	vecSize := cf.Ty.ArrayLen
-	if arrlen > 0 {
-		vecSize = cf.Ty.ArrayLen / arrlen
-	} else {
-		arrlen = 1
-	}
-	for i := 0; i < arrlen; i++ {
-		if len(cf.Ty.Fields) > 0 {
-			// this is a struct, assign each one of them, this must be done recursively!
-			fmt.Fprintf(buf, "\tfrom_api(&(me->%v[%v]), d.%v[%v]);\n", cf.Name, i, cf.Name, i)
-		} else if cf.Ty.ty.Name == "mat2" || cf.Ty.ty.Name == "mat3" || cf.Ty.ty.Name == "mat4" {
-			// binf it...
 
-			if arrlen > 1 {
-				fmt.Fprintf(buf, "\tfrom_api(&(me->%v[%v]), &d.%v[%v]);// mat bind\n", cf.Name, i, cf.Name, i*vecSize)
-			} else {
-				fmt.Fprintf(buf, "\tfrom_api(&(me->%v), d.%v);// mat bind\n", cf.Name, cf.Name)
-			}
+	/*
+		arrlen := cf.CxxArrayLen()
+		vecSize := cf.Ty.ArraySize()
+		if arrlen > 0 {
+			vecSize = cf.Ty.ArraySize() / arrlen
 		} else {
-			if arrlen > 1 {
-				for j := 0; j < vecSize; j++ {
-					fmt.Fprintf(buf, "\tme->%v[%v][%v] = d.%v[%v];\n", cf.Name, i, j, cf.Name, i*vecSize+j)
+			arrlen = 1
+		}
+		for i := 0; i < arrlen; i++ {
+			if len(cf.Ty.Fields) > 0 {
+				// this is a struct, assign each one of them, this must be done recursively!
+				fmt.Fprintf(buf, "\tfrom_api(&(me->%v[%v]), d.%v[%v]);\n", cf.Name, i, cf.Name, i)
+			} else if cf.Ty.ty.Name == "mat2" || cf.Ty.ty.Name == "mat3" || cf.Ty.ty.Name == "mat4" {
+				// binf it...
+
+				if arrlen > 1 {
+					fmt.Fprintf(buf, "\tfrom_api(&(me->%v[%v]), &d.%v[%v]);// mat bind\n", cf.Name, i, cf.Name, i*vecSize)
+				} else {
+					fmt.Fprintf(buf, "\tfrom_api(&(me->%v), d.%v);// mat bind\n", cf.Name, cf.Name)
 				}
 			} else {
-				for j := 0; j < vecSize; j++ {
-					fmt.Fprintf(buf, "\tme->%v[%v] = d.%v[%v];\n", cf.Name, j, cf.Name, j)
+				if arrlen > 1 {
+					for j := 0; j < vecSize; j++ {
+						fmt.Fprintf(buf, "\tme->%v[%v][%v] = d.%v[%v];\n", cf.Name, i, j, cf.Name, i*vecSize+j)
+					}
+				} else {
+					for j := 0; j < vecSize; j++ {
+						fmt.Fprintf(buf, "\tme->%v[%v] = d.%v[%v];\n", cf.Name, j, cf.Name, j)
+					}
 				}
 			}
 		}
+	*/
+}
+
+func printArrayBinding(buf io.Writer, cf CField, ty *CType, indices []int) {
+
+	if !ty.isArray() {
+
+		indexS := ""
+		for _, i := range indices {
+			indexS += fmt.Sprintf("[%v]", i)
+		}
+		if len(ty.Fields) > 0 {
+			// this is a struct, assign each one of them, this must be done recursively!
+			fmt.Fprintf(buf, "\tfrom_api(&(me->%v%v), d.%v%v);\n", cf.Name, indexS, cf.Name, indexS)
+		} else if cf.Ty.ty.Name == "mat2" || cf.Ty.ty.Name == "mat3" || cf.Ty.ty.Name == "mat4" {
+			// binf it...
+			fmt.Fprintf(buf, "\tfrom_api(&(me->%v%v), &d.%v%v);// mat bind\n", cf.Name, indexS, cf.Name, indexS)
+		} else {
+
+			fmt.Fprintf(buf, "\tme->%v%v = d.%v%v;\n", cf.Name, indexS, cf.Name, indexS)
+		}
+
+		return
+	}
+
+	vecSize := ty.Array.len
+	for i := 0; i < vecSize; i++ {
+		printArrayBinding(buf, cf, ty.Array.ty, append(indices, i))
 	}
 }
 

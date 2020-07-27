@@ -65,7 +65,10 @@ private:
   };
 
   struct cpt_error_t error() {
-    return (struct cpt_error_t){error_no, &error_msg[0]};
+    struct cpt_error_t r;
+    r.code = error_no;
+    r.msg = &error_msg[0];
+    return r;
   };
 
   // TODO: Make this one take reference instead.

@@ -97,7 +97,7 @@ func (k *Kernel) Dispatch(bind Data, numGroupsX, numGroupsY, numGroupsZ int) err
 	chc := bytes.NewBuffer(nil)
 	for _, arg := range inp.Arguments {
 		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, arg.Arrno)}
-		fmt.Fprintf(buf, "\t%v: %v", cf.Name, go2c(chc, inp, cf, "\t\t", "bind"))
+		fmt.Fprintf(buf, "\t%v: %v", cf.Name, go2c(chc, cf, cf.Ty, fmt.Sprintf("bind.%v", cf.GoName()))+",\n")
 	}
 
 	buf.WriteString(`	}
@@ -174,130 +174,120 @@ func ensureLength(f string, l, s, arr int) error {
 			buf.WriteString("}\n\n")
 		}
 	}
-	/*
 
-	   // Encode encodes e as a std430 glsl struct to buf. If buf if not long
-	   // enough to hold e it will panic. Encode is an expensive call and should
-	   // normally not be used for a large number of Elements.
-	   type (e *Element) Encode(buf []byte) {
+}
 
-	   }
+func decodeType(buf io.Writer, parentPos int, ty *CType, head string) (offset int) {
+	if ty.isArray() {
+		// TODO: write this into an array in go instead so the generated code does not become so long?
+		for i := 0; i < ty.Array.len; i++ {
+			offset += decodeType(buf, parentPos+offset, ty.Array.ty, head+fmt.Sprintf("[%v]", i))
+		}
+		return
+	}
 
+	if len(ty.Fields) > 0 {
+		for _, f := range ty.Fields {
+			offset += decodeType(buf, parentPos+offset, f.Ty, head+"."+f.GoName())
+		}
+		return
+	}
 
-	   // Decodes data from buf and fills e. If buf is not long enough the call
-	   // will panic.
-	   type (e *Element) Decode(buf []byte) {
+	if ty.Name == "mat2" || ty.Name == "mat3" || ty.Name == "mat4" {
+		size, _ := strconv.Atoi(ty.Name[len(ty.Name)-1:])
+		for i := 0; i < size*size; i++ {
+			offset += 4 // float is always 4...
+			if size == 3 && i > 0 && i%3 == 0 {
+				fmt.Fprintf(buf, "// 4 byte spill for mat3 alignment\n")
+				offset += 4
+			}
+			fmt.Fprintf(buf, "bo.PutUint32(d[%v:], math.Float32bits(e%v[%v]))\n", parentPos+offset, head, i)
+		}
+		return
+	}
 
-	   }
-
-	*/
-
+	switch ty.BasicGoType() {
+	case "bool":
+		fmt.Fprintf(buf, "\tif bo.Uint32(d[%v:]) == 0 {\n", parentPos)
+		fmt.Fprintf(buf, "\t\te%v = false\n", head)
+		fmt.Fprintf(buf, "\t} else {\n")
+		fmt.Fprintf(buf, "\t\te%v = true\n", head)
+		fmt.Fprintf(buf, "\t}\n")
+		offset += 4
+	case "float32":
+		fmt.Fprintf(buf, "\te%v = math.Float32frombits(bo.Uint32(d[%v:]))\n", head, parentPos)
+		offset += 4
+	case "int32":
+		fmt.Fprintf(buf, "\te%v = int32(bo.Uint32(d[%v:]))\n", head, parentPos)
+		offset += 4
+	case "uint32":
+		fmt.Fprintf(buf, "\te%v = bo.Uint32(d[%v:])\n", head, parentPos)
+		offset += 4
+	default:
+		// So this is a struct type we have defined, we thus need to use it's Decode method in turn to get it correctly.
+		fmt.Fprintf(buf, "\t(&e%v).Decode(d[%v:]) \n", head, parentPos)
+		offset += ty.Size.ByteSize
+	}
+	return
 }
 
 func printStructDecodes(buf io.Writer, parentPos int, t *Type, head string) int {
-	for _, f := range t.CType().Fields {
-		if f.Ty.IsSlice {
-			panic("cannot encode decode struct with slice, we do not have the size")
-		}
-		if !f.Ty.ty.userType && len(f.Ty.Fields) > 0 {
-			panic("cannot have struct with build in complex type to Encode / Decode")
-		}
-		no := f.Ty.ArrayLen
-		if no == 0 {
-			no = 1
-		}
-		for i := 0; i < no; i++ {
-			// special case matrices since they are not contigiuous but have 0 elements in them that we need handle...
-
-			arrelem := ""
-			if f.Ty.ArrayLen != 0 {
-				arrelem = fmt.Sprintf("[%v]", i)
-			}
-			tt := f.Ty.BasicGoType()
-			if f.Ty.ty.Name == "mat2" || f.Ty.ty.Name == "mat3" || f.Ty.ty.Name == "mat4" {
-				size, _ := strconv.Atoi(f.Ty.ty.Name[len(f.Ty.ty.Name)-1:])
-				nonopass := 0
-				if size == 3 {
-					nonopass = i / size
-				}
-				ii := i + nonopass
-				fmt.Fprintf(buf, "\te%v.%v%v = math.Float32frombits(bo.Uint32(d[%v:]))\n", head, f.GoName(), arrelem, parentPos+f.ByteOffset+ii*4)
-			} else {
-				underlysize := f.Ty.Size.ByteSize
-				if f.Ty.ArrayLen != 0 {
-					underlysize /= f.Ty.ArrayLen
-				}
-				switch tt {
-				case "bool":
-					fmt.Fprintf(buf, "\tif bo.Uint32(d[%v:]) == 0 {\n", parentPos+f.ByteOffset+i*4)
-					fmt.Fprintf(buf, "\t\te%v.%v%v = false\n", head, f.GoName(), arrelem)
-					fmt.Fprintf(buf, "\t} else {\n")
-					fmt.Fprintf(buf, "\t\te%v.%v%v = true\n", head, f.GoName(), arrelem)
-					fmt.Fprintf(buf, "\t}\n")
-				case "float32":
-					fmt.Fprintf(buf, "\te%v.%v%v = math.Float32frombits(bo.Uint32(d[%v:]))\n", head, f.GoName(), arrelem, parentPos+f.ByteOffset+i*4)
-				case "int32":
-					fmt.Fprintf(buf, "\te%v.%v%v = int32(bo.Uint32(d[%v:]))\n", head, f.GoName(), arrelem, parentPos+f.ByteOffset+i*4)
-				case "uint32":
-					fmt.Fprintf(buf, "\te%v.%v%v = bo.Uint32(d[%v:])\n", head, f.GoName(), arrelem, parentPos+f.ByteOffset+i*4)
-				default:
-					// So this is a struct type we have defined, we thus need to use it's Decode method in turn to get it correctly.
-					fmt.Fprintf(buf, "\t(&e.%v%v).Decode(d[%v:]) \n", f.GoName(), arrelem, parentPos+f.ByteOffset+i*underlysize)
-				}
-			}
-		}
-	}
-	return 0
+	return decodeType(buf, parentPos, t.cType, head)
 }
 
-func printStructEncodes(buf io.Writer, parentPos int, t *Type, head string) int {
-	for _, f := range t.CType().Fields {
-		if f.Ty.IsSlice {
-			panic("cannot encode decode struct with slice, we do not have the size")
+func encodeType(buf io.Writer, parentPos int, ty *CType, head string) (offset int) {
+	if ty.isArray() {
+		// TODO: write this into an array in go instead so the generated code does not become so long?
+		for i := 0; i < ty.Array.len; i++ {
+			offset += encodeType(buf, parentPos+offset, ty.Array.ty, head+fmt.Sprintf("[%v]", i))
 		}
-		if !f.Ty.ty.userType && len(f.Ty.Fields) > 0 {
-			panic("cannot have struct with build in complex type to Encode / Decode")
-		}
-		no := f.Ty.ArrayLen
-		if no == 0 {
-			no = 1
-		}
-		for i := 0; i < no; i++ {
-			arrelem := ""
-			if f.Ty.ArrayLen != 0 {
-				arrelem = fmt.Sprintf("[%v]", i)
-			}
-			tt := f.Ty.BasicGoType()
-			if f.Ty.ty.Name == "mat2" || f.Ty.ty.Name == "mat3" || f.Ty.ty.Name == "mat4" {
-				size, _ := strconv.Atoi(f.Ty.ty.Name[len(f.Ty.ty.Name)-1:])
-				nonopass := 0
-				if size == 3 {
-					nonopass = i / size
-				}
-				ii := i + nonopass
-				fmt.Fprintf(buf, "\tbo.PutUint32(d[%v:], math.Float32bits(e%v.%v%v))\n", parentPos+f.ByteOffset+ii*4, head, f.GoName(), arrelem)
-			} else {
-				underlysize := f.Ty.Size.ByteSize
-				if f.Ty.ArrayLen != 0 {
-					underlysize /= f.Ty.ArrayLen
-				}
-				switch tt {
-				case "bool":
-					fmt.Fprintf(buf, "\tbo.PutUint32(d[%v:], uint32(cBool(e%v.%v%v)))\n", parentPos+f.ByteOffset+i*4, head, f.GoName(), arrelem)
-				case "float32":
-					fmt.Fprintf(buf, "\tbo.PutUint32(d[%v:], math.Float32bits(e%v.%v%v))\n", parentPos+f.ByteOffset+i*4, head, f.GoName(), arrelem)
-				case "int32":
-					fmt.Fprintf(buf, "\tbo.PutUint32(d[%v:], uint32(e%v.%v%v))\n", parentPos+f.ByteOffset+i*4, head, f.GoName(), arrelem)
-				case "uint32":
-					fmt.Fprintf(buf, "\tbo.PutUint32(d[%v:], e%v.%v%v)\n", parentPos+f.ByteOffset+i*4, head, f.GoName(), arrelem)
-				default:
-					// So this is a struct type we have defined, we thus need to use it's Decode method in turn to get it correctly.
-					fmt.Fprintf(buf, "\t(&e.%v%v).Encode(d[%v:]) \n", f.GoName(), arrelem, parentPos+f.ByteOffset+i*underlysize)
-				}
-			}
-		}
+		return
 	}
-	return 0
+
+	if len(ty.Fields) > 0 {
+		for _, f := range ty.Fields {
+			offset += encodeType(buf, parentPos+offset, f.Ty, head+"."+f.GoName())
+		}
+		return
+	}
+
+	if ty.Name == "mat2" || ty.Name == "mat3" || ty.Name == "mat4" {
+		size, _ := strconv.Atoi(ty.Name[len(ty.Name)-1:])
+		for i := 0; i < size*size; i++ {
+			offset += 4 // float is always 4...
+			if size == 3 && i > 0 && i%3 == 0 {
+				fmt.Fprintf(buf, "// 4 byte spill for mat3 alignment\n")
+				offset += 4
+			}
+			fmt.Fprintf(buf, "bo.PutUint32(d[%v:], math.Float32bits(e%v[%v]))\n", parentPos+offset, head, i)
+		}
+		return
+	}
+
+	switch ty.BasicGoType() {
+	case "bool":
+		fmt.Fprintf(buf, "\tbo.PutUint32(d[%v:], uint32(cBool(e%v)))\n", parentPos, head)
+		offset += 4
+	case "float32":
+		fmt.Fprintf(buf, "\tbo.PutUint32(d[%v:], math.Float32bits(e%v))\n", parentPos, head)
+		offset += 4
+	case "int32":
+		fmt.Fprintf(buf, "\tbo.PutUint32(d[%v:], uint32(e%v))\n", parentPos, head)
+		offset += 4
+	case "uint32":
+		fmt.Fprintf(buf, "\tbo.PutUint32(d[%v:], e%v)\n", parentPos, head)
+		offset += 4
+	default:
+		// So this is a struct type we have defined, we thus need to use it's Decode method in turn to get it correctly.
+		fmt.Fprintf(buf, "\t(&e%v).Encode(d[%v:]) \n", head, parentPos)
+		offset += ty.Size.ByteSize
+	}
+	return
+}
+
+// TODO: mae these call each other instead of re-encoding everything...
+func printStructEncodes(buf io.Writer, parentPos int, t *Type, head string) int {
+	return encodeType(buf, parentPos, t.cType, head)
 }
 
 func goNameCType(s string) string {
@@ -308,55 +298,41 @@ func goNameCType(s string) string {
 	return s
 }
 
+// how we call it above:
+// fmt.Fprintf(buf, "\t%v: %v", cf.Name, go2c(chc, inp, cf, "\t\t", "bind"))
+
 // writes the right hand side of the : only
-func go2c(chc io.Writer, inp Input, cf CField, indent, head string) (str string) {
-	buf := bytes.NewBuffer(nil)
-	if cf.Ty.IsSlice {
+func go2c(chc io.Writer, cf CField, ty *CType, head string) (str string) {
+	if ty.isSlice() {
 		// we can do nothing but cast it to unsafe - else we would have to copy all the data...
-		fmt.Fprintf(chc, "\tif err := ensureLength(\"%v.%v\", len(%v.%v), %v, %v); err != nil { return err }\n",
-			head, cf.GoName(), head, cf.GoName(), cf.Ty.Size.ByteSize, -cf.Ty.ArrayLen)
-		return fmt.Sprintf("unsafe.Pointer(&%v.%v[0]),\n", head, cf.GoName())
-	}
-	if len(cf.Ty.Fields) > 0 {
-		// struct type
-		if cf.Ty.ArrayLen > 0 {
-			fmt.Fprintf(buf, indent+"%v{\n", cf.Ty.GoCTypeName())
-			for i := 0; i < cf.Ty.ArrayLen; i++ {
-				fmt.Fprintf(buf, " C.%v{\n", cf.Ty.Name)
-				for _, f := range cf.Ty.Fields {
-					fmt.Fprintf(buf, indent+"%v: %v", f.Name, go2c(chc, inp, f, indent+"\t", head+"."+cf.GoName()+fmt.Sprintf("[%v]", i)))
-				}
-				fmt.Fprintf(buf, indent+"},\n")
-			}
-			fmt.Fprintf(buf, indent+"},\n")
-			return buf.String()
-		} else {
-			fmt.Fprintf(buf, " C.%v{\n", cf.Ty.Name)
-			for _, f := range cf.Ty.Fields {
-				fmt.Fprintf(buf, indent+"%v: %v", f.Name, go2c(chc, inp, f, indent+"\t", head+"."+cf.GoName()))
-			}
-			fmt.Fprintf(buf, indent+"},\n")
-			return buf.String()
-		}
+		fmt.Fprintf(chc, "\tif err := ensureLength(\"%v\", len(%v), %v, %v); err != nil { return err }\n",
+			head, head, ty.Array.ty.Size.ByteSize, -1)
+		return fmt.Sprintf("unsafe.Pointer(&%v[0])", head)
 	}
 
-	if cf.Ty.ArrayLen > 0 {
-		// this is an array - cannot cast directly so must create
-		fmt.Fprintf(buf, indent+"%v{\n", cf.Ty.GoCTypeName())
-		for i := 0; i < cf.Ty.ArrayLen; i++ {
-			fmt.Fprintf(buf, indent+"\t(%v)(%v.%v[%v]),\n", goNameCType(cf.Ty.Name), head, cf.GoName(), i)
+	// the actual stuff below:
+	buf := bytes.NewBuffer(nil)
+	if ty.isArray() {
+		fmt.Fprintf(buf, "%v{\n", ty.GoCTypeName())
+		for i := 0; i < ty.Array.len; i++ {
+			io.WriteString(buf, go2c(chc, cf, ty.Array.ty, head+fmt.Sprintf("[%v]", i))+",\n")
 		}
-		fmt.Fprintf(buf, indent+"},\n")
+		fmt.Fprintf(buf, "}")
 		return buf.String()
 	}
 
-	if cf.Ty.ty.Name == "Bool" {
-		return fmt.Sprintf("(%v)(cBool(%v.%v)),\n", cf.Ty.GoCTypeName(), head, cf.GoName())
+	if len(ty.Fields) > 0 {
+		fmt.Fprintf(buf, " C.%v{\n", ty.Name)
+		for _, f := range ty.Fields {
+			fmt.Fprintf(buf, "%v: %v,\n", f.Name, go2c(chc, f, f.Ty, head+"."+f.GoName()))
+		}
+		fmt.Fprintf(buf, "}")
+		return buf.String()
 	}
 
-	// TODO: Need to handle struct type here also
+	if ty.Name == "Bool" {
+		return fmt.Sprintf("(%v)(cBool(%v.%v))", cf.Ty.GoCTypeName(), head, cf.GoName())
+	}
 
-	return fmt.Sprintf("(%v)(%v.%v),\n", cf.Ty.GoCTypeName(), head, cf.GoName())
-
-	//panic("unhandled type in go2c conversion")
+	return fmt.Sprintf("(%v)(%v)", ty.GoCTypeName(), head)
 }

@@ -39,12 +39,36 @@ type Type struct {
 // A CType represents the type defined in shared.h that will translate
 // to a go type.
 type CType struct {
-	ty       *Type
-	Name     string
-	Fields   []CField // len = 0 not an struct type
-	ArrayLen int
-	IsSlice  bool
-	Size     Alignment
+	ty     *Type
+	Name   string
+	Fields []CField // len = 0 not an struct type
+	Array  ArrayType
+	Size   Alignment
+}
+
+func (ct *CType) isArray() bool {
+	return ct.Array.len != 0
+}
+
+func (ct *CType) ArraySize() int {
+	if !ct.isArray() {
+		return 0
+	}
+	// recursively get the size
+	size := 1
+	for el := ct; el.isArray(); el = el.Array.ty {
+		size *= el.Array.len
+	}
+	return size
+}
+
+func (ct *CType) isSlice() bool {
+	return ct.Array.len == -1
+}
+
+type ArrayType struct {
+	ty  *CType
+	len int
 }
 
 type CField struct {
@@ -57,17 +81,6 @@ type CField struct {
 type Alignment struct {
 	ByteSize      int
 	ByteAlignment int
-}
-
-func (ct CType) GetSize() int {
-	size := ct.Size.ByteSize
-	if ct.ArrayLen > 0 {
-		size *= ct.ArrayLen
-	}
-	if ct.IsSlice {
-		panic("getsize") // TODO: This will brea on non-64 bit platforms!
-	}
-	return size
 }
 
 func (tt *Types) Get(ty string) *Type {
@@ -116,22 +129,27 @@ func (tt *Types) put(ty string, t *Type) {
 
 func (ct CType) String() string {
 	s := ct.Name + " "
-	if ct.IsSlice {
+	if ct.isSlice() {
 		s += "*"
 	}
 	s += ct.Name
-	if ct.ArrayLen > 0 {
-		s += fmt.Sprintf("[%v]", ct.ArrayLen)
+	if ct.isArray() {
+		for el := ct; el.isArray(); el = *el.Array.ty {
+			s += fmt.Sprintf("[%v]", el.Array.len)
+		}
 	}
 	return s
 }
 
 func (ct CType) GoCTypeName() string {
 	s := ""
-	if ct.IsSlice {
+	if ct.isSlice() {
 		s += "*"
-	} else if ct.ArrayLen > 0 {
-		s += fmt.Sprintf("[%v]", ct.ArrayLen)
+	}
+	if ct.isArray() {
+		for el := ct; el.isArray(); el = *el.Array.ty {
+			s += fmt.Sprintf("[%v]", el.Array.len)
+		}
 	}
 	s += "C." + ct.Name
 	return s
@@ -146,7 +164,7 @@ func (t Type) GoName() string {
 }
 
 func (cf CField) String() string {
-	if cf.Ty.IsSlice {
+	if cf.Ty.isSlice() {
 		// this is a slice, so will be passed as pointer, but since
 		// we cannot ensure that the caller has the same struct alignment
 		// that we require we pass it as a void* and require the caller
@@ -154,31 +172,16 @@ func (cf CField) String() string {
 		return "void* " + cf.Name
 	}
 	s := cf.Ty.Name + " " + cf.Name
-	if cf.Ty.ArrayLen > 0 {
-		s += fmt.Sprintf("[%v]", cf.Ty.ArrayLen)
+	if cf.Ty.isArray() {
+		for el := cf.Ty; el.isArray(); el = el.Array.ty {
+			s += fmt.Sprintf("[%v]", el.Array.len)
+		}
 	}
 	return s
 }
 
-func (cf CField) CxxArrayLen() int {
-	rt := types.Get(cf.Ty.ty.Name)
-	if rt.CType().ArrayLen != cf.Ty.ArrayLen {
-		if rt.CType().ArrayLen != 0 {
-			size := cf.Ty.ArrayLen / rt.CType().ArrayLen
-			if size*rt.CType().ArrayLen != cf.Ty.ArrayLen {
-				panic("this cannot be an array, what is happening?")
-			}
-			return size
-		} else {
-			return cf.Ty.ArrayLen
-		}
-	} else {
-		return 0
-	}
-}
-
 func (cf CField) CxxFieldString() string {
-	if cf.Ty.IsSlice {
+	if cf.Ty.isSlice() {
 		// there are no built-in types with arbitrary length so this is fine
 		return fmt.Sprintf("\t%v* %v;\n", cf.Ty.ty.Name, cf.Name)
 	}
@@ -187,14 +190,16 @@ func (cf CField) CxxFieldString() string {
 	// NoElem here is in C world, e.g. a vec has a length, so what we want
 	// to chec is if the length is equal to the one for the defined type or
 	// not
-	if ll := cf.CxxArrayLen(); ll > 0 {
-		s += fmt.Sprintf("[%v]", ll)
+	if cf.Ty.isArray() {
+		for el := cf.Ty; el.isArray(); el = el.Array.ty {
+			s += fmt.Sprintf("[%v]", el.Array.len)
+		}
 	}
 	return s + ";"
 }
 
 func (cf CField) CxxFieldStringRef() string {
-	if cf.Ty.IsSlice {
+	if cf.Ty.isSlice() {
 		// there are no built-in types with arbitrary length so this is fine
 		return fmt.Sprintf("\t%v* (&%v);\n", cf.Ty.ty.Name, cf.Name)
 	}
@@ -203,8 +208,10 @@ func (cf CField) CxxFieldStringRef() string {
 	// NoElem here is in C world, e.g. a vec has a length, so what we want
 	// to chec is if the length is equal to the one for the defined type or
 	// not
-	if ll := cf.CxxArrayLen(); ll > 0 {
-		s += fmt.Sprintf("[%v]", ll)
+	if cf.Ty.isArray() {
+		for el := cf.Ty; el.isArray(); el = el.Array.ty {
+			s += fmt.Sprintf("[%v]", el.Array.len)
+		}
 	}
 	return s + ";"
 }
@@ -214,7 +221,7 @@ func (cf CField) GoName() string {
 }
 
 func (ct CType) BasicGoType() string {
-	if ct.IsSlice {
+	if ct.isSlice() {
 		// this is a slice, so will be passed as pointer, but since
 		// we cannot ensure that the caller has the same struct alignment
 		// that we require we pass it as a void* and require the caller
@@ -237,12 +244,16 @@ func (ct CType) BasicGoType() string {
 }
 
 func (ct CType) GoName() string {
-	if ct.IsSlice {
+	if ct.isSlice() {
 		return "[]" + ct.BasicGoType()
 	}
 	var goTypeName = ct.BasicGoType()
-	if ct.ArrayLen > 0 {
-		goTypeName = fmt.Sprintf("[%v]%v", ct.ArrayLen, goTypeName)
+	if ct.isArray() {
+		goTypeName = ""
+		for el := &ct; el.isArray(); el = el.Array.ty {
+			goTypeName += fmt.Sprintf("[%v]", el.Array.len)
+		}
+		goTypeName += fmt.Sprintf("%v", ct.BasicGoType())
 	}
 	return goTypeName
 }
@@ -252,16 +263,22 @@ func createBasicBuiltinTypes() {
 		tt := Type{
 			Name: name,
 		}
-		tt.cType = &CType{
-			ty:       &tt,
-			Name:     cname,
-			Fields:   []CField{},
-			ArrayLen: noelc,
-			Size:     Alignment{ByteSize: size, ByteAlignment: align},
+		ut := CType{
+			ty:   &tt,
+			Name: cname,
+			Size: Alignment{ByteSize: 4, ByteAlignment: 4},
 		}
+		ttt := CType{
+			ty:    &tt,
+			Name:  cname,
+			Array: ArrayType{len: noelc, ty: &ut},
+			Size:  Alignment{ByteSize: size, ByteAlignment: align},
+		}
+
+		tt.cType = &ttt
 		types.types[name] = &tt
 	}
-	cbt("Bool", "int32_t", 0, 4, 4) // here - how do we create go name?
+	cbt("Bool", "int32_t", 0, 4, 4)
 	cbt("int32_t", "int32_t", 0, 4, 4)
 	cbt("uint32_t", "uint32_t", 0, 4, 4)
 	cbt("float", "float", 0, 4, 4)
@@ -308,47 +325,42 @@ func createComplexBuiltinTypes() {
 	co("image2Drgba32f", "data", "float", -1, "width", "int32_t", 0)
 }
 
+func recCreateArrayType(ty *CType, noels []int) {
+	if len(noels) == 0 {
+		return
+	}
+	nt := *(ty) // a copy of it
+
+	noel := noels[0]
+	noels = noels[1:]
+
+	ty.Array.len = noel
+	ty.Array.ty = &nt
+	recCreateArrayType(&nt, noels)
+
+	// propagate the size all the way bac up
+	ty.Size.ByteSize = nt.Size.ByteSize * noel
+
+}
+
 func maybeCreateArrayType(ty string, noels []int) *CType {
 	// create a new ctype representing this type with an array one
 	if len(noels) == 0 {
 		return types.Get(ty).CType()
 	}
 
-	// accumulate the number of elelemnts
-	noel := 1
-	for i, v := range noels {
-		if v < 0 && i < len(noels)-1 {
-			panic("only support slice as last type of array yet")
-		}
-		noel *= v
-	}
-	iss := false
-	if noel < 0 {
-		noel *= -1
-		iss = true
-	}
-
+	// recurse down to create this one as is
 	bt := *types.Get(ty).CType()
-	par := *bt.ty
-	if bt.ArrayLen == 0 {
-		bt.ArrayLen = noel
-	} else if bt.IsSlice {
-		panic("we cannot slice a slice")
-	} else {
-		bt.ArrayLen *= noel
-	}
-
-	bt.Size.ByteSize *= noel
-
-	bt.ty = &par
-	bt.IsSlice = iss
-
-	if bt.IsSlice {
-		// TODO: 64 bit only
+	noel := noels[0]
+	if noel < 0 {
+		// a slice can only be the first available one!
+		// TODO: 64 bit only - else change alignment?
+		recCreateArrayType(&bt, noels)
 		bt.Size.ByteAlignment = 8
 		bt.Size.ByteSize = 8
+	} else {
+		recCreateArrayType(&bt, noels)
 	}
-
 	return &bt
 }
 
@@ -423,10 +435,10 @@ func alignVisit(ct *CType) Alignment {
 	}
 
 	rsize := ct.Size
-	if ct.ArrayLen > 0 {
-		rsize.ByteSize *= ct.ArrayLen
+	if ct.ArraySize() > 0 {
+		rsize.ByteSize *= ct.ArraySize()
 	}
-	if ct.IsSlice {
+	if ct.isSlice() {
 		// TODO: this is 64 bit only...
 		rsize.ByteSize = 8
 		rsize.ByteAlignment = 8
@@ -450,5 +462,22 @@ func exportType(s string) {
 	t.apiType = true
 	for _, f := range t.cType.Fields {
 		exportType(f.Ty.ty.Name)
+	}
+}
+
+func (cf CField) CxxArrayLen() int {
+	rt := types.Get(cf.Ty.ty.Name)
+	if rt.CType().ArraySize() != cf.Ty.ArraySize() {
+		if rt.CType().ArraySize() != 0 {
+			size := cf.Ty.ArraySize() / rt.CType().ArraySize()
+			if size*rt.CType().ArraySize() != cf.Ty.ArraySize() {
+				panic("this cannot be an array, what is happening?")
+			}
+			return size
+		} else {
+			return cf.Ty.ArraySize()
+		}
+	} else {
+		return 0
 	}
 }

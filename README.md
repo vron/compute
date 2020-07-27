@@ -50,10 +50,8 @@ which runs all the tests and follow what it does (see also scripts/build.go).
 
 # TODO
  - Cross compile for all platforms from the Docker image.
- - Implement support for ARM64, Android, Linux, Windows
- - Create referenceGo implementations of all benchmarks
+ - Implement support for ARM64, Android, Linux
  - Add test cases for name collisions and fix the naming...
- - Support multi-file shader with macros - use https://github.com/facebookresearch/CParser/blob/master/cparser.lua ?
  - Gain more performance but letting the compiler now we have ensured all the alignments
  - Add pathological test cases such as wg size 0 etc. etc.
  - Document the alignment for []byte in both the C header and the go package.

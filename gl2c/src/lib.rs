@@ -278,19 +278,19 @@ pub fn type_specifier_non_array(s: &mut State, t: &syntax::TypeSpecifierNonArray
     })
 }
 
-pub fn visit_type_specifier(s: &mut State, t: &syntax::TypeSpecifier) -> (String, i32) {
+pub fn visit_type_specifier(s: &mut State, t: &syntax::TypeSpecifier) -> (String, Vec<i32>) { // TODO: arrno must be a vec, do on all places where i32!
     // Habndle the array types here!
     let ty = type_specifier_non_array(s, &t.ty);
     let _ = write!(s, "{}", ty);
 
     if let Some(ref arr_spec) = t.array_specifier {
-        let l = match visit_array_spec(s, arr_spec) {
-            Some(v) => v,
-            None => panic!("arrays with non - constant lengths not supported yet"),
-        };
-        return (ty, l);
+        let arrno = visit_array_spec(s, arr_spec);
+        if arrno.len() == 0 {
+            panic!("arrays with non - constant lengths not supported yet");
+        }
+        return (ty, arrno);
     }
-    (ty, 0)
+    (ty, vec!())
 }
 
 pub fn visit_fully_specified_type(s: &mut State, t: &syntax::FullySpecifiedType) {
@@ -336,17 +336,14 @@ pub fn visit_struct_field(s: &mut State, field: &syntax::StructFieldSpecifier) -
         let _ = write!(s, "{}", " ");
     }
 
-    let (tys, _) = visit_type_specifier(s, &field.ty);
+    let (tys, mut arrno1) = visit_type_specifier(s, &field.ty); // TOOD: could this not be an array of sizes?
     let _ = write!(s, "{}", " ");
 
     // there’s at least one identifier
     let mut identifiers = field.identifiers.0.iter();
     let identifier = identifiers.next().unwrap();
 
-    let arrno = match visit_arrayed_identifier(s, identifier, false) {
-        None => vec!(),
-        Some(v) => vec!(v),
-    };
+    let mut arrno = visit_arrayed_identifier(s, identifier, false);
 
     // write the rest of the identifiers
     for _identifier in identifiers {
@@ -354,6 +351,8 @@ pub fn visit_struct_field(s: &mut State, field: &syntax::StructFieldSpecifier) -
         //let _ = write!(s, "{}", ", ");
         //visit_arrayed_identifier(s, identifier);
     }
+
+    arrno.append(& mut arrno1);
 
     let _ = write!(s, "{}", ";\n");
     Argument {
@@ -363,22 +362,27 @@ pub fn visit_struct_field(s: &mut State, field: &syntax::StructFieldSpecifier) -
     }
 }
 
-pub fn visit_array_spec(s: &mut State, a: &syntax::ArraySpecifier) -> Option<i32> {
-    match *a {
-        syntax::ArraySpecifier::Unsized => {
-            let _ = write!(s, "{}", "[]");
-            return Some(-1);
-        }
-        syntax::ArraySpecifier::ExplicitlySized(ref e) => {
-            let _ = write!(s, "{}", "[");
-            let a = visit_expr(s, &e);
-            let _ = write!(s, "{}", "]");
-            a
+pub fn visit_array_spec(s: &mut State, a: &syntax::ArraySpecifier) -> Vec<i32> {
+    let mut vv: Vec<i32> = vec!();
+    let  v = &a.dimensions;
+    for dim in v.into_iter() {
+        match dim {
+            syntax::ArraySpecifierDimension::Unsized => {
+                let _ = write!(s, "{}", "[]");
+                vv.push(-1);
+            }
+            syntax::ArraySpecifierDimension::ExplicitlySized(ref e) => {
+                let _ = write!(s, "{}", "[");
+                let mut a = visit_expr(s, &e);
+                let _ = write!(s, "{}", "]");
+                vv.append(&mut a);
+            }
         }
     }
+    vv
 }
 
-pub fn visit_arrayed_identifier(s: &mut State, a: &syntax::ArrayedIdentifier, is_ref:bool) -> Option<i32> {
+pub fn visit_arrayed_identifier(s: &mut State, a: &syntax::ArrayedIdentifier, is_ref:bool) -> Vec<i32> {
     if is_ref {
         let _ = write!(s, " (& {})", a.ident);
     } else {
@@ -388,7 +392,7 @@ pub fn visit_arrayed_identifier(s: &mut State, a: &syntax::ArrayedIdentifier, is
     if let Some(ref arr_spec) = a.array_spec {
         return visit_array_spec(s, arr_spec);
     }
-    None
+    vec!()
 }
 
 pub fn non_accepted_layout_spec(s: &mut State, q: &syntax::TypeQualifier) -> bool {
@@ -687,8 +691,7 @@ pub fn maybe_handle_shared(state: &mut State, l: &syntax::InitDeclaratorList) ->
         return None;
     }
 
-    let mut typname = type_specifier_non_array(state, &d.ty.ty.ty);
-
+    let (mut typname, mut arrnot) = visit_type_specifier(state, &d.ty.ty);
     // if this has a tail we should not handle it
     for _decl in &l.tail {
         return None;
@@ -697,14 +700,10 @@ pub fn maybe_handle_shared(state: &mut State, l: &syntax::InitDeclaratorList) ->
     // if there is any array part add that
     let mut arrno = vec!();
     if let Some(a) = &l.head.array_specifier {
-        let len = visit_array_spec(state, &a);
-        match len {
-            Some(l) => {
-                arrno.push(l);
-            },
-            _ => {},
-        };
+        arrno = visit_array_spec(state, &a);
     }
+
+    arrno.append(&mut arrnot);
     if let Some(ref name) = d.name {    // Add this argument
         typname.push_str(&subtype[..]);
         state.add_shared(Argument{
@@ -791,16 +790,16 @@ pub fn visit_double(s: &mut State, x: f64) {
     }
 }
 
-pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Option<i32> {
+pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Vec<i32> {
     match *expr {
         syntax::Expr::Variable(ref i) => visit_identifier(s, &i),
         syntax::Expr::IntConst(ref x) => {
             let _ = write!(s, "((int32_t)({}))", x);
-            return Some(*x);
+            return vec!(*x);
         }
         syntax::Expr::UIntConst(ref x) => {
             let _ = write!(s, "((uint32_t)({}))", x);
-            return Some((*x) as i32);
+            return vec!((*x) as i32);
         }
         syntax::Expr::BoolConst(ref x) => {
             let _ = write!(s, "{}", x);
@@ -837,8 +836,12 @@ pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Option<i32> {
             visit_expr(s, &e);
         }
         syntax::Expr::Bracket(ref e, ref a) => {
-            visit_expr(s, &e);
-            visit_array_spec(s, &a);
+            let mut v: Vec<i32> = vec!();
+            let mut aa = visit_expr(s, &e);
+            v.append(&mut aa);
+            let mut b = visit_array_spec(s, &a);
+            v.append(&mut b);
+            return v
         }
         syntax::Expr::FunCall(ref fun, ref args) => {
             // we treat function calls to vector constructors specially since
@@ -930,7 +933,7 @@ pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Option<i32> {
             visit_expr(s, &b);
         }
     }
-    return None;
+    return vec!();
 }
 
 pub fn visit_path(s: &mut State, path: &syntax::Path) {
@@ -1085,7 +1088,6 @@ pub fn visit_declaration(s: &mut State, d: &syntax::Declaration, global: bool) {
         syntax::Declaration::InitDeclaratorList(ref list) => {
             // Global struct goes here
             // So does buffer inputs that are not part of blos
-
             s.push_output(Output::None);
             match maybe_handle_global_buffer(s, &list) {
                 Some(..) => {

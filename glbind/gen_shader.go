@@ -134,7 +134,6 @@ func generateSetData(buf *bufio.Writer, inp Input) {
 			Name: a.Name,
 			Ty:   maybeCreateArrayType(a.Ty, a.Arrno),
 		}
-		//recChecAlignment(buf, inp, cf, "d.")
 		cf.CxxBinding(buf)
 	}
 
