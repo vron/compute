@@ -10,9 +10,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/vron/compute/glbind/input"
+	"github.com/vron/compute/glbind/types"
 )
 
-func generateGo(inp Input) {
+func generateGo(inp input.Input, ts *types.Types) {
 	f, err := os.Create(filepath.Join(fOut, "kernel.go"))
 
 	if err != nil {
@@ -50,7 +53,7 @@ type Kernel struct {
 `)
 
 	// Write the struct definitions
-	for _, st := range types.ExportedStructTypes() {
+	for _, st := range ts.ExportedStructTypes() {
 		fmt.Fprintf(buf, "type %v struct {\n", st.GoName())
 		for _, a := range st.CType().Fields {
 			fmt.Fprintf(buf, "\t%v %v\n", a.GoName(), a.Ty.GoName())
@@ -61,7 +64,7 @@ type Kernel struct {
 	buf.WriteString(`type Data struct {
 `)
 	for _, arg := range inp.Arguments {
-		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, arg.Arrno)}
+		cf := types.CField{Name: arg.Name, Ty: ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)}
 		buf.WriteString("\t" + cf.GoName() + " " + cf.Ty.GoName() + "\n")
 	}
 	buf.WriteString(`}
@@ -96,7 +99,7 @@ func (k *Kernel) Dispatch(bind Data, numGroupsX, numGroupsY, numGroupsZ int) err
 	// Create a c-struct from the provided that that is uploaded to the ernel
 	chc := bytes.NewBuffer(nil)
 	for _, arg := range inp.Arguments {
-		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, arg.Arrno)}
+		cf := types.CField{Name: arg.Name, Ty: ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)}
 		fmt.Fprintf(buf, "\t%v: %v", cf.Name, go2c(chc, cf, cf.Ty, fmt.Sprintf("bind.%v", cf.GoName()))+",\n")
 	}
 
@@ -159,8 +162,8 @@ func ensureLength(f string, l, s, arr int) error {
 	// Also create the Encode Decode Methods for types that are referred in arrays
 	buf.WriteString("var bo = binary.LittleEndian\n\n")
 
-	for _, st := range types.ExportedStructTypes() {
-		if st.userType {
+	for _, st := range ts.ExportedStructTypes() {
+		if st.UserDefined {
 			fmt.Fprintf(buf, "func (d %v) Stride() int { return %v }\n", st.GoName(), st.CType().Size.ByteSize)
 			fmt.Fprintf(buf, "func (d %v) Alignment() int { return %v }\n\n", st.GoName(), st.CType().Size.ByteAlignment)
 
@@ -177,11 +180,11 @@ func ensureLength(f string, l, s, arr int) error {
 
 }
 
-func decodeType(buf io.Writer, parentPos int, ty *CType, head string) (offset int) {
-	if ty.isArray() {
+func decodeType(buf io.Writer, parentPos int, ty *types.CType, head string) (offset int) {
+	if ty.ArrayLen() != 0 {
 		// TODO: write this into an array in go instead so the generated code does not become so long?
-		for i := 0; i < ty.Array.len; i++ {
-			offset += decodeType(buf, parentPos+offset, ty.Array.ty, head+fmt.Sprintf("[%v]", i))
+		for i := 0; i < ty.ArrayLen(); i++ {
+			offset += decodeType(buf, parentPos+offset, ty.Array.Ty, head+fmt.Sprintf("[%v]", i))
 		}
 		return
 	}
@@ -231,15 +234,15 @@ func decodeType(buf io.Writer, parentPos int, ty *CType, head string) (offset in
 	return
 }
 
-func printStructDecodes(buf io.Writer, parentPos int, t *Type, head string) int {
-	return decodeType(buf, parentPos, t.cType, head)
+func printStructDecodes(buf io.Writer, parentPos int, t *types.GlslType, head string) int {
+	return decodeType(buf, parentPos, t.C, head)
 }
 
-func encodeType(buf io.Writer, parentPos int, ty *CType, head string) (offset int) {
-	if ty.isArray() {
+func encodeType(buf io.Writer, parentPos int, ty *types.CType, head string) (offset int) {
+	if ty.ArrayLen() != 0 {
 		// TODO: write this into an array in go instead so the generated code does not become so long?
-		for i := 0; i < ty.Array.len; i++ {
-			offset += encodeType(buf, parentPos+offset, ty.Array.ty, head+fmt.Sprintf("[%v]", i))
+		for i := 0; i < ty.ArrayLen(); i++ {
+			offset += encodeType(buf, parentPos+offset, ty.Array.Ty, head+fmt.Sprintf("[%v]", i))
 		}
 		return
 	}
@@ -286,8 +289,8 @@ func encodeType(buf io.Writer, parentPos int, ty *CType, head string) (offset in
 }
 
 // TODO: mae these call each other instead of re-encoding everything...
-func printStructEncodes(buf io.Writer, parentPos int, t *Type, head string) int {
-	return encodeType(buf, parentPos, t.cType, head)
+func printStructEncodes(buf io.Writer, parentPos int, t *types.GlslType, head string) int {
+	return encodeType(buf, parentPos, t.C, head)
 }
 
 func goNameCType(s string) string {
@@ -302,20 +305,20 @@ func goNameCType(s string) string {
 // fmt.Fprintf(buf, "\t%v: %v", cf.Name, go2c(chc, inp, cf, "\t\t", "bind"))
 
 // writes the right hand side of the : only
-func go2c(chc io.Writer, cf CField, ty *CType, head string) (str string) {
-	if ty.isSlice() {
+func go2c(chc io.Writer, cf types.CField, ty *types.CType, head string) (str string) {
+	if ty.IsSlice() {
 		// we can do nothing but cast it to unsafe - else we would have to copy all the data...
 		fmt.Fprintf(chc, "\tif err := ensureLength(\"%v\", len(%v), %v, %v); err != nil { return err }\n",
-			head, head, ty.Array.ty.Size.ByteSize, -1)
+			head, head, ty.Array.Ty.Size.ByteSize, -1)
 		return fmt.Sprintf("unsafe.Pointer(&%v[0])", head)
 	}
 
 	// the actual stuff below:
 	buf := bytes.NewBuffer(nil)
-	if ty.isArray() {
+	if ty.ArrayLen() != 0 {
 		fmt.Fprintf(buf, "%v{\n", ty.GoCTypeName())
-		for i := 0; i < ty.Array.len; i++ {
-			io.WriteString(buf, go2c(chc, cf, ty.Array.ty, head+fmt.Sprintf("[%v]", i))+",\n")
+		for i := 0; i < ty.ArrayLen(); i++ {
+			io.WriteString(buf, go2c(chc, cf, ty.Array.Ty, head+fmt.Sprintf("[%v]", i))+",\n")
 		}
 		fmt.Fprintf(buf, "}")
 		return buf.String()

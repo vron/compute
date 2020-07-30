@@ -7,9 +7,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/vron/compute/glbind/input"
+	"github.com/vron/compute/glbind/types"
 )
 
-func generateComp(inp Input) {
+func generateComp(inp input.Input, ts *types.Types) {
 	f, err := os.Create(filepath.Join(fOut, "generated/shader.hpp"))
 	if err != nil {
 		log.Fatalln(err)
@@ -39,7 +42,7 @@ func generateComp(inp Input) {
 	}
 	buf.WriteString("\n")
 
-	writeSharedStruct(buf, inp)
+	writeSharedStruct(buf, inp, ts)
 
 	buf.WriteString("struct shader {\n")
 	buf.WriteString("\tuvec3 gl_NumWorkGroups;\n")
@@ -52,13 +55,13 @@ func generateComp(inp Input) {
 
 	// write all the globals we should be able to access
 	for _, arg := range inp.Arguments {
-		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, arg.Arrno)}
+		cf := types.CField{Name: arg.Name, Ty: ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)}
 		fmt.Fprintf(buf, cf.CxxFieldString()+"\n")
 	}
 
 	// also write all the shared variabels we should be able to access
 	for _, arg := range inp.Shared {
-		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, arg.Arrno)}
+		cf := types.CField{Name: arg.Name, Ty: ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)}
 		fmt.Fprintf(buf, cf.CxxFieldStringRef()+"\n")
 	}
 
@@ -103,7 +106,7 @@ func generateComp(inp Input) {
 	void set_data(cpt_data d) {
 	auto me = this;
 `)
-	generateSetData(buf, inp)
+	generateSetData(buf, inp, ts)
 	buf.WriteString(`
 	}
 `)
@@ -116,25 +119,25 @@ func generateComp(inp Input) {
 `)
 }
 
-func writeSharedStruct(buf io.Writer, inp Input) {
+func writeSharedStruct(buf io.Writer, inp input.Input, ts *types.Types) {
 	fmt.Fprintf(buf, "class  shared_data_t {\npublic:\n")
 	for _, arg := range inp.Shared {
-		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, arg.Arrno)}
+		cf := types.CField{Name: arg.Name, Ty: ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)}
 		fmt.Fprintf(buf, cf.CxxFieldString()+"\n")
 	}
 	fmt.Fprintf(buf, "} ;\n\n")
 }
 
-func generateSetData(buf *bufio.Writer, inp Input) {
+func generateSetData(buf *bufio.Writer, inp input.Input, ts *types.Types) {
 	// we have an variable d of the data struct type that we need
 	// to translate to the member variables.
 
 	for _, a := range inp.Arguments {
-		cf := CField{
+		cf := types.CField{
 			Name: a.Name,
-			Ty:   maybeCreateArrayType(a.Ty, a.Arrno),
+			Ty:   ts.MaybeCreateArrayType(a.Ty, a.Arrno),
 		}
-		cf.CxxBinding(buf)
+		CxxBinding(cf, buf)
 	}
 
 	buf.WriteString("\treturn;")

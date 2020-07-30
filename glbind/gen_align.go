@@ -6,9 +6,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/vron/compute/glbind/input"
+	"github.com/vron/compute/glbind/types"
 )
 
-func generateAlignH(inp Input) {
+func generateAlignH(inp input.Input, ts *types.Types) {
 	f, err := os.Create(filepath.Join(fOut, "generated/align.hpp"))
 
 	if err != nil {
@@ -28,16 +31,16 @@ func generateAlignH(inp Input) {
 		msg := fmt.Sprintf("static check failed: alignof(%v) != %v", ty, al)
 		fmt.Fprintf(buf, "\tif(alignof(%v) != %v) { return this->set_error(EINVAL, \"%v\"); };\n", ty, al, msg)
 	}
-	for _, v := range types.AllTypes() {
+	for _, v := range ts.AllTypes() {
 		cSize(v.Name, v.CType().Size.ByteSize)
 		cAlign(v.Name, v.CType().Size.ByteAlignment)
 	}
 
 	// ensure alignments of incoming pointers since provided by user
 	for _, a := range inp.Arguments {
-		cf := CField{
+		cf := types.CField{
 			Name: a.Name,
-			Ty:   maybeCreateArrayType(a.Ty, a.Arrno),
+			Ty:   ts.MaybeCreateArrayType(a.Ty, a.Arrno),
 		}
 		recChecAlignment(buf, inp, cf, "d.")
 	}
@@ -47,8 +50,8 @@ func generateAlignH(inp Input) {
 
 }
 
-func recChecAlignment(buf *bufio.Writer, inp Input, cf CField, head string) {
-	if cf.Ty.isSlice() {
+func recChecAlignment(buf *bufio.Writer, inp input.Input, cf types.CField, head string) {
+	if cf.Ty.IsSlice() {
 		// this is a slice, will be provided as pointer so chec it
 		ai := cf.Ty.Size
 		msg := fmt.Sprintf("the argument %v provided was not aligned to a %v byte boundary as required", head+cf.Name, ai.ByteAlignment)

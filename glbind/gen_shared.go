@@ -6,9 +6,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/vron/compute/glbind/input"
+	"github.com/vron/compute/glbind/types"
 )
 
-func generateSharedH(inp Input) {
+func generateSharedH(inp input.Input, ts *types.Types) {
 	f, err := os.Create(filepath.Join(fOut, "generated/shared.h"))
 
 	if err != nil {
@@ -55,7 +58,7 @@ struct cpt_error_t {
 `)
 
 	// Write all complex types
-	for _, st := range types.ExportedStructTypes() {
+	for _, st := range ts.ExportedStructTypes() {
 		fmt.Fprintf(buf, "typedef struct {\n")
 		for _, f := range st.CType().Fields {
 			buf.WriteString("  " + f.String() + ";\n")
@@ -73,8 +76,8 @@ struct cpt_error_t {
 `)
 	buf.WriteString("typedef struct {\n")
 	for _, arg := range inp.Arguments {
-		ty := maybeCreateArrayType(arg.Ty, arg.Arrno)
-		cf := CField{Name: arg.Name, Ty: ty}
+		ty := ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)
+		cf := types.CField{Name: arg.Name, Ty: ty}
 		buf.WriteString("  " + cf.String() + ";\n")
 	}
 	buf.WriteString(`} cpt_data;

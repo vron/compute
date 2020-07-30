@@ -7,6 +7,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/vron/compute/glbind/input"
+	"github.com/vron/compute/glbind/types"
 )
 
 type vinfo struct {
@@ -31,7 +34,7 @@ var vtypes = []vinfo{
 
 var vsizes = []int{2, 3, 4}
 
-func generateTypes(inp Input) {
+func generateTypes(inp input.Input, ts *types.Types) {
 	f, err := os.Create(filepath.Join(fOut, "generated/usertypes.hpp"))
 	if err != nil {
 		log.Fatalln(err)
@@ -46,13 +49,8 @@ func generateTypes(inp Input) {
 	buf.WriteString("#include \"./shared.h\"\n")
 
 	// TODO: This entire thing could probably be made much smaller with templates... ?
-	//generateCreateVectors(buf)
-	//generateImageTypes(buf)
-	//generateBuiltinFunctions(buf)
-	//generateMatrixTypes(buf)
-	//generateCreateMatrices(buf)
-	generateUserStructs(buf, inp)
-	generatefromapi(buf, inp)
+	generateUserStructs(buf, inp, ts)
+	generatefromapi(buf, inp, ts)
 }
 
 func compName(i int) string {
@@ -353,14 +351,14 @@ vec4 normalize(vec4 a) { return a / length(a); };
 
 }
 
-func generateUserStructs(buf *bufio.Writer, inp Input) {
+func generateUserStructs(buf *bufio.Writer, inp input.Input, ts *types.Types) {
 	buf.WriteString("\n\n\n")
 
-	for _, s := range types.UserStructs() {
+	for _, s := range ts.UserStructs() {
 		fmt.Fprintf(buf, "struct %v;\n", s.Name)
 	}
 	buf.WriteString("\n")
-	for _, s := range types.UserStructs() {
+	for _, s := range ts.UserStructs() {
 		fmt.Fprintf(buf, "struct %v {// size=%v alignment=%v\n", s.Name, s.CType().Size.ByteSize, s.CType().Size.ByteAlignment)
 
 		for _, f := range s.CType().Fields {
@@ -435,13 +433,13 @@ func bVec(size int) func(InputArgument) string {
 
 */
 
-func (cf CField) CxxBinding(buf io.Writer) {
-	if cf.Ty.isSlice() {
+func CxxBinding(cf types.CField, buf io.Writer) {
+	if cf.Ty.IsSlice() {
 		// slice type, the incomeing is *void and we assume everyhting is layed out, assign!
-		fmt.Fprintf(buf, "\tme->%v = (%v*)d.%v;\n", cf.Name, cf.Ty.ty.Name, cf.Name)
+		fmt.Fprintf(buf, "\tme->%v = (%v*)d.%v;\n", cf.Name, cf.Ty.GlslType.Name, cf.Name)
 		return
 	}
-	if cf.Ty.ArraySize() == 0 && (len(cf.Ty.Fields) > 0 || cf.Ty.ty.Name == "mat2" || cf.Ty.ty.Name == "mat3" || cf.Ty.ty.Name == "mat4") {
+	if cf.Ty.ArraySize() == 0 && (len(cf.Ty.Fields) > 0 || cf.Ty.GlslType.Name == "mat2" || cf.Ty.GlslType.Name == "mat3" || cf.Ty.GlslType.Name == "mat4") {
 		// this is a struct, assign each one of them, this must be done recursively!
 		fmt.Fprintf(buf, "\tfrom_api(&(me->%v), d.%v);\n", cf.Name, cf.Name)
 		return
@@ -452,47 +450,12 @@ func (cf CField) CxxBinding(buf io.Writer) {
 	}
 
 	printArrayBinding(buf, cf, cf.Ty, []int{})
-	// so it is an array of stuff, do the same for each once of the elements, but as a temp hac
-	// chec for the underlying type to set from that if needed
 
-	/*
-		arrlen := cf.CxxArrayLen()
-		vecSize := cf.Ty.ArraySize()
-		if arrlen > 0 {
-			vecSize = cf.Ty.ArraySize() / arrlen
-		} else {
-			arrlen = 1
-		}
-		for i := 0; i < arrlen; i++ {
-			if len(cf.Ty.Fields) > 0 {
-				// this is a struct, assign each one of them, this must be done recursively!
-				fmt.Fprintf(buf, "\tfrom_api(&(me->%v[%v]), d.%v[%v]);\n", cf.Name, i, cf.Name, i)
-			} else if cf.Ty.ty.Name == "mat2" || cf.Ty.ty.Name == "mat3" || cf.Ty.ty.Name == "mat4" {
-				// binf it...
-
-				if arrlen > 1 {
-					fmt.Fprintf(buf, "\tfrom_api(&(me->%v[%v]), &d.%v[%v]);// mat bind\n", cf.Name, i, cf.Name, i*vecSize)
-				} else {
-					fmt.Fprintf(buf, "\tfrom_api(&(me->%v), d.%v);// mat bind\n", cf.Name, cf.Name)
-				}
-			} else {
-				if arrlen > 1 {
-					for j := 0; j < vecSize; j++ {
-						fmt.Fprintf(buf, "\tme->%v[%v][%v] = d.%v[%v];\n", cf.Name, i, j, cf.Name, i*vecSize+j)
-					}
-				} else {
-					for j := 0; j < vecSize; j++ {
-						fmt.Fprintf(buf, "\tme->%v[%v] = d.%v[%v];\n", cf.Name, j, cf.Name, j)
-					}
-				}
-			}
-		}
-	*/
 }
 
-func printArrayBinding(buf io.Writer, cf CField, ty *CType, indices []int) {
+func printArrayBinding(buf io.Writer, cf types.CField, ty *types.CType, indices []int) {
 
-	if !ty.isArray() {
+	if ty.ArrayLen() != 0 {
 
 		indexS := ""
 		for _, i := range indices {
@@ -501,7 +464,7 @@ func printArrayBinding(buf io.Writer, cf CField, ty *CType, indices []int) {
 		if len(ty.Fields) > 0 {
 			// this is a struct, assign each one of them, this must be done recursively!
 			fmt.Fprintf(buf, "\tfrom_api(&(me->%v%v), d.%v%v);\n", cf.Name, indexS, cf.Name, indexS)
-		} else if cf.Ty.ty.Name == "mat2" || cf.Ty.ty.Name == "mat3" || cf.Ty.ty.Name == "mat4" {
+		} else if cf.Ty.GlslType.Name == "mat2" || cf.Ty.GlslType.Name == "mat3" || cf.Ty.GlslType.Name == "mat4" {
 			// binf it...
 			fmt.Fprintf(buf, "\tfrom_api(&(me->%v%v), &d.%v%v);// mat bind\n", cf.Name, indexS, cf.Name, indexS)
 		} else {
@@ -512,30 +475,20 @@ func printArrayBinding(buf io.Writer, cf CField, ty *CType, indices []int) {
 		return
 	}
 
-	vecSize := ty.Array.len
+	vecSize := ty.Array.Len
 	for i := 0; i < vecSize; i++ {
-		printArrayBinding(buf, cf, ty.Array.ty, append(indices, i))
+		printArrayBinding(buf, cf, ty.Array.Ty, append(indices, i))
 	}
 }
 
-func generatefromapi(buf *bufio.Writer, inp Input) {
-	/*
-		if types.Get("image2Drgba32f").apiType {
-			buf.WriteString(`	void from_api(cpt_image2Drgba32f d) {
-			this->data = (float*)d.data;
-			this->width = d.width;
-		};
+func generatefromapi(buf *bufio.Writer, inp input.Input, ts *types.Types) {
 
-		`)
-		}
-		buf.WriteString("};\n")
-	*/
 	// Write implementation for the from api methods, copying field by field (rec if needed)
-	for _, s := range types.ExportedStructTypes() {
+	for _, s := range ts.ExportedStructTypes() {
 		fmt.Fprintf(buf, "void from_api(%v *me, %v d) {\n", s.Name, s.CType().Name)
 
 		for _, cf := range s.CType().Fields {
-			cf.CxxBinding(buf)
+			CxxBinding(cf, buf)
 		}
 
 		fmt.Fprintf(buf, "};\n\n")

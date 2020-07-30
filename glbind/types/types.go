@@ -1,74 +1,73 @@
 // TODO: To e.g support multiple levels of arrays we must do proper parsing and not merge array lengths etc...
 
-package main
+package types
 
 import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/vron/compute/glbind/input"
 )
 
-var types *Types
+type Types struct {
+	types map[string]*GlslType
+}
 
-func parseTypeInfo(inp Input) {
-	types = &Types{types: map[string]*Type{}}
-	createBasicBuiltinTypes()
-	createComplexBuiltinTypes()
-	// create the user defined struct types
+func New(inp input.Input) *Types {
+	types := &Types{types: map[string]*GlslType{}}
+	types.createBasicBuiltinTypes()
+	types.createComplexBuiltinTypes()
 	for i, str := range inp.Structs {
-		recurseCreateStructTypes(i+1, inp, str)
+		types.recurseCreateStructTypes(i+1, inp, str)
 	}
 	types.calculateAlignments()
-	findApiExportedTypes(inp)
+	types.findApiExportedTypes(inp)
+
+	return types
 }
 
-// Types contains infomration about all types in use.
-type Types struct {
-	types map[string]*Type
+type GlslType struct {
+	Name        string
+	Export      bool
+	UserDefined bool
+	C           *CType
+	GlslOrder   int
 }
 
-// A Type represents the GLSL type as parsed from the shader code
-type Type struct {
-	Name         string // the name as refered to it in GLSL
-	apiType      bool   // true if the type is used in the api and should be exported
-	userType     bool   // type created in glsl
-	cType        *CType
-	userStructId int
-}
-
-// A CType represents the type defined in shared.h that will translate
-// to a go type.
 type CType struct {
-	ty     *Type
-	Name   string
-	Fields []CField // len = 0 not an struct type
+	GlslType *GlslType
+	Name     string
+
+	Fields []CField
 	Array  ArrayType
-	Size   Alignment
+
+	Size Alignment
 }
 
-func (ct *CType) isArray() bool {
-	return ct.Array.len != 0
+func (ct *CType) ArrayLen() int {
+	return ct.Array.Len
 }
 
 func (ct *CType) ArraySize() int {
-	if !ct.isArray() {
+	if ct.ArrayLen() != 0 {
 		return 0
 	}
 	// recursively get the size
 	size := 1
-	for el := ct; el.isArray(); el = el.Array.ty {
-		size *= el.Array.len
+	for el := ct; el.ArrayLen() != 0; el = el.Array.Ty {
+		size *= el.Array.Len
 	}
 	return size
 }
 
-func (ct *CType) isSlice() bool {
-	return ct.Array.len == -1
+func (ct *CType) IsSlice() bool {
+	return ct.Array.Len == -1
 }
 
 type ArrayType struct {
-	ty  *CType
-	len int
+	Ty  *CType
+	Len int
 }
 
 type CField struct {
@@ -83,7 +82,7 @@ type Alignment struct {
 	ByteAlignment int
 }
 
-func (tt *Types) Get(ty string) *Type {
+func (tt *Types) Get(ty string) *GlslType {
 	v, o := tt.types[ty]
 	if !o {
 		panic("tried to access undefined type: " + ty)
@@ -91,9 +90,9 @@ func (tt *Types) Get(ty string) *Type {
 	return v
 }
 
-func (tt *Types) ExportedStructTypes() (ts []*Type) {
+func (tt *Types) ExportedStructTypes() (ts []*GlslType) {
 	for _, v := range tt.types {
-		if v.apiType && len(v.CType().Fields) > 0 {
+		if v.Export && len(v.CType().Fields) > 0 {
 			ts = append(ts, v)
 		}
 	}
@@ -101,7 +100,7 @@ func (tt *Types) ExportedStructTypes() (ts []*Type) {
 	return
 }
 
-func (tt *Types) AllTypes() (ts []*Type) {
+func (tt *Types) AllTypes() (ts []*GlslType) {
 	for _, v := range tt.types {
 		ts = append(ts, v)
 	}
@@ -109,9 +108,9 @@ func (tt *Types) AllTypes() (ts []*Type) {
 	return
 }
 
-func (tt *Types) UserStructs() (ts []*Type) {
+func (tt *Types) UserStructs() (ts []*GlslType) {
 	for _, v := range tt.types {
-		if v.userType {
+		if v.UserDefined {
 			ts = append(ts, v)
 		}
 	}
@@ -119,7 +118,7 @@ func (tt *Types) UserStructs() (ts []*Type) {
 	return
 }
 
-func (tt *Types) put(ty string, t *Type) {
+func (tt *Types) put(ty string, t *GlslType) {
 	_, o := tt.types[ty]
 	if o {
 		panic("trying to create type with same name: " + ty)
@@ -129,13 +128,13 @@ func (tt *Types) put(ty string, t *Type) {
 
 func (ct CType) String() string {
 	s := ct.Name + " "
-	if ct.isSlice() {
+	if ct.IsSlice() {
 		s += "*"
 	}
 	s += ct.Name
-	if ct.isArray() {
-		for el := ct; el.isArray(); el = *el.Array.ty {
-			s += fmt.Sprintf("[%v]", el.Array.len)
+	if ct.ArrayLen() != 0 {
+		for el := ct; el.ArrayLen() != 0; el = *el.Array.Ty {
+			s += fmt.Sprintf("[%v]", el.Array.Len)
 		}
 	}
 	return s
@@ -143,28 +142,28 @@ func (ct CType) String() string {
 
 func (ct CType) GoCTypeName() string {
 	s := ""
-	if ct.isSlice() {
+	if ct.IsSlice() {
 		s += "*"
 	}
-	if ct.isArray() {
-		for el := ct; el.isArray(); el = *el.Array.ty {
-			s += fmt.Sprintf("[%v]", el.Array.len)
+	if ct.ArrayLen() != 0 {
+		for el := ct; el.ArrayLen() != 0; el = *el.Array.Ty {
+			s += fmt.Sprintf("[%v]", el.Array.Len)
 		}
 	}
 	s += "C." + ct.Name
 	return s
 }
 
-func (t Type) CType() *CType {
-	return t.cType
+func (t GlslType) CType() *CType {
+	return t.C
 }
 
-func (t Type) GoName() string {
+func (t GlslType) GoName() string {
 	return strings.Title(t.Name)
 }
 
 func (cf CField) String() string {
-	if cf.Ty.isSlice() {
+	if cf.Ty.IsSlice() {
 		// this is a slice, so will be passed as pointer, but since
 		// we cannot ensure that the caller has the same struct alignment
 		// that we require we pass it as a void* and require the caller
@@ -172,45 +171,45 @@ func (cf CField) String() string {
 		return "void* " + cf.Name
 	}
 	s := cf.Ty.Name + " " + cf.Name
-	if cf.Ty.isArray() {
-		for el := cf.Ty; el.isArray(); el = el.Array.ty {
-			s += fmt.Sprintf("[%v]", el.Array.len)
+	if cf.Ty.ArrayLen() != 0 {
+		for el := cf.Ty; el.ArrayLen() != 0; el = el.Array.Ty {
+			s += fmt.Sprintf("[%v]", el.Array.Len)
 		}
 	}
 	return s
 }
 
 func (cf CField) CxxFieldString() string {
-	if cf.Ty.isSlice() {
+	if cf.Ty.IsSlice() {
 		// there are no built-in types with arbitrary length so this is fine
-		return fmt.Sprintf("\t%v* %v;\n", cf.Ty.ty.Name, cf.Name)
+		return fmt.Sprintf("\t%v* %v;\n", cf.Ty.GlslType.Name, cf.Name)
 	}
-	s := "\t" + cf.Ty.ty.Name + " " + cf.Name
+	s := "\t" + cf.Ty.GlslType.Name + " " + cf.Name
 
 	// NoElem here is in C world, e.g. a vec has a length, so what we want
 	// to chec is if the length is equal to the one for the defined type or
 	// not
-	if cf.Ty.isArray() {
-		for el := cf.Ty; el.isArray(); el = el.Array.ty {
-			s += fmt.Sprintf("[%v]", el.Array.len)
+	if cf.Ty.ArrayLen() != 0 {
+		for el := cf.Ty; el.ArrayLen() != 0; el = el.Array.Ty {
+			s += fmt.Sprintf("[%v]", el.Array.Len)
 		}
 	}
 	return s + ";"
 }
 
 func (cf CField) CxxFieldStringRef() string {
-	if cf.Ty.isSlice() {
+	if cf.Ty.IsSlice() {
 		// there are no built-in types with arbitrary length so this is fine
-		return fmt.Sprintf("\t%v* (&%v);\n", cf.Ty.ty.Name, cf.Name)
+		return fmt.Sprintf("\t%v* (&%v);\n", cf.Ty.GlslType.Name, cf.Name)
 	}
-	s := "\t" + cf.Ty.ty.Name + "(& " + cf.Name + ")"
+	s := "\t" + cf.Ty.GlslType.Name + "(& " + cf.Name + ")"
 
 	// NoElem here is in C world, e.g. a vec has a length, so what we want
 	// to chec is if the length is equal to the one for the defined type or
 	// not
-	if cf.Ty.isArray() {
-		for el := cf.Ty; el.isArray(); el = el.Array.ty {
-			s += fmt.Sprintf("[%v]", el.Array.len)
+	if cf.Ty.ArrayLen() != 0 {
+		for el := cf.Ty; el.ArrayLen() != 0; el = el.Array.Ty {
+			s += fmt.Sprintf("[%v]", el.Array.Len)
 		}
 	}
 	return s + ";"
@@ -221,7 +220,7 @@ func (cf CField) GoName() string {
 }
 
 func (ct CType) BasicGoType() string {
-	if ct.isSlice() {
+	if ct.IsSlice() {
 		// this is a slice, so will be passed as pointer, but since
 		// we cannot ensure that the caller has the same struct alignment
 		// that we require we pass it as a void* and require the caller
@@ -231,7 +230,7 @@ func (ct CType) BasicGoType() string {
 	var goTypeName string
 	if len(ct.Fields) > 0 {
 		goTypeName = strings.Title(strings.TrimPrefix(ct.Name, "cpt_"))
-	} else if ct.ty.Name == "Bool" {
+	} else if ct.GlslType.Name == "Bool" {
 		goTypeName = "bool"
 	} else {
 		goTypeName = strings.TrimSuffix(ct.Name, "_t")
@@ -244,38 +243,38 @@ func (ct CType) BasicGoType() string {
 }
 
 func (ct CType) GoName() string {
-	if ct.isSlice() {
+	if ct.IsSlice() {
 		return "[]" + ct.BasicGoType()
 	}
 	var goTypeName = ct.BasicGoType()
-	if ct.isArray() {
+	if ct.ArrayLen() != 0 {
 		goTypeName = ""
-		for el := &ct; el.isArray(); el = el.Array.ty {
-			goTypeName += fmt.Sprintf("[%v]", el.Array.len)
+		for el := &ct; el.ArrayLen() != 0; el = el.Array.Ty {
+			goTypeName += fmt.Sprintf("[%v]", el.Array.Len)
 		}
 		goTypeName += fmt.Sprintf("%v", ct.BasicGoType())
 	}
 	return goTypeName
 }
 
-func createBasicBuiltinTypes() {
+func (types *Types) createBasicBuiltinTypes() {
 	cbt := func(name string, cname string, noelc int, size int, align int) {
-		tt := Type{
+		tt := GlslType{
 			Name: name,
 		}
 		ut := CType{
-			ty:   &tt,
-			Name: cname,
-			Size: Alignment{ByteSize: 4, ByteAlignment: 4},
+			GlslType: &tt,
+			Name:     cname,
+			Size:     Alignment{ByteSize: 4, ByteAlignment: 4},
 		}
 		ttt := CType{
-			ty:    &tt,
-			Name:  cname,
-			Array: ArrayType{len: noelc, ty: &ut},
-			Size:  Alignment{ByteSize: size, ByteAlignment: align},
+			GlslType: &tt,
+			Name:     cname,
+			Array:    ArrayType{Len: noelc, Ty: &ut},
+			Size:     Alignment{ByteSize: size, ByteAlignment: align},
 		}
 
-		tt.cType = &ttt
+		tt.C = &ttt
 		types.types[name] = &tt
 	}
 	cbt("Bool", "int32_t", 0, 4, 4)
@@ -296,17 +295,17 @@ func createBasicBuiltinTypes() {
 	cbt("mat4", "float", 16, 16*4, 16)
 }
 
-func createComplexBuiltinTypes() {
+func (types *Types) createComplexBuiltinTypes() {
 	co := func(name string, args ...interface{}) {
-		tt := Type{
+		tt := GlslType{
 			Name: name,
 		}
 		ct := CType{
-			ty:     &tt,
-			Name:   "cpt_" + name,
-			Fields: []CField{},
+			GlslType: &tt,
+			Name:     "cpt_" + name,
+			Fields:   []CField{},
 		}
-		tt.cType = &ct
+		tt.C = &ct
 		for i := 0; i+2 < len(args); i += 3 {
 			noel := args[i+2].(int)
 			name := args[i].(string)
@@ -316,7 +315,7 @@ func createComplexBuiltinTypes() {
 				Ty:   types.Get(ty).CType(),
 			}
 			if noel != 0 {
-				f.Ty = maybeCreateArrayType(ty, []int{noel})
+				f.Ty = types.MaybeCreateArrayType(ty, []int{noel})
 			}
 			ct.Fields = append(ct.Fields, f)
 		}
@@ -325,7 +324,7 @@ func createComplexBuiltinTypes() {
 	co("image2Drgba32f", "data", "float", -1, "width", "int32_t", 0)
 }
 
-func recCreateArrayType(ty *CType, noels []int) {
+func (types *Types) recCreateArrayType(ty *CType, noels []int) {
 	if len(noels) == 0 {
 		return
 	}
@@ -334,16 +333,16 @@ func recCreateArrayType(ty *CType, noels []int) {
 	noel := noels[0]
 	noels = noels[1:]
 
-	ty.Array.len = noel
-	ty.Array.ty = &nt
-	recCreateArrayType(&nt, noels)
+	ty.Array.Len = noel
+	ty.Array.Ty = &nt
+	types.recCreateArrayType(&nt, noels)
 
 	// propagate the size all the way bac up
 	ty.Size.ByteSize = nt.Size.ByteSize * noel
 
 }
 
-func maybeCreateArrayType(ty string, noels []int) *CType {
+func (types *Types) MaybeCreateArrayType(ty string, noels []int) *CType {
 	// create a new ctype representing this type with an array one
 	if len(noels) == 0 {
 		return types.Get(ty).CType()
@@ -355,28 +354,28 @@ func maybeCreateArrayType(ty string, noels []int) *CType {
 	if noel < 0 {
 		// a slice can only be the first available one!
 		// TODO: 64 bit only - else change alignment?
-		recCreateArrayType(&bt, noels)
+		types.recCreateArrayType(&bt, noels)
 		bt.Size.ByteAlignment = 8
 		bt.Size.ByteSize = 8
 	} else {
-		recCreateArrayType(&bt, noels)
+		types.recCreateArrayType(&bt, noels)
 	}
 	return &bt
 }
 
-func recurseCreateStructTypes(i int, inp Input, str InputStruct) {
+func (types *Types) recurseCreateStructTypes(i int, inp input.Input, str input.InputStruct) {
 	if _, o := types.types[str.Name]; o {
 		return
 	}
-	st := Type{
-		Name:         str.Name,
-		userType:     true,
-		userStructId: i,
+	st := GlslType{
+		Name:        str.Name,
+		UserDefined: true,
+		GlslOrder:   i,
 	}
 	ct := CType{
-		ty:     &st,
-		Name:   "cpt_" + str.Name,
-		Fields: []CField{},
+		GlslType: &st,
+		Name:     "cpt_" + str.Name,
+		Fields:   []CField{},
 	}
 	for _, f := range str.Fields {
 		if _, o := types.types[f.Ty]; !o {
@@ -387,22 +386,22 @@ func recurseCreateStructTypes(i int, inp Input, str InputStruct) {
 			Ty:   types.Get(f.Ty).CType(),
 		}
 		if len(f.Arrno) != 0 {
-			cf.Ty = maybeCreateArrayType(f.Ty, f.Arrno)
+			cf.Ty = types.MaybeCreateArrayType(f.Ty, f.Arrno)
 		}
 		ct.Fields = append(ct.Fields, cf)
 	}
-	st.cType = &ct
+	st.C = &ct
 	types.put(str.Name, &st)
 }
 
-func (tt *Types) calculateAlignments() {
-	for _, t := range tt.types {
+func (types *Types) calculateAlignments() {
+	for _, t := range types.types {
 		// all basic types have alignment, so this must be a struct type:
-		alignVisit(t.CType())
+		types.alignVisit(t.CType())
 	}
 }
 
-func alignVisit(ct *CType) Alignment {
+func (types *Types) alignVisit(ct *CType) Alignment {
 	// from https://www.oreilly.com/library/view/opengl-programming-guide/9780132748445/app09lev1sec3.html
 	// but we treat vec3 as vec4 to allow for vector operations
 	if ct.Size != (Alignment{}) {
@@ -412,7 +411,7 @@ func alignVisit(ct *CType) Alignment {
 	offset := 0
 	maxFieldAlignment := 0
 	for i, f := range ct.Fields {
-		fa := alignVisit(f.Ty) // => we cannot handle recursive types, thats fine...
+		fa := types.alignVisit(f.Ty) // => we cannot handle recursive types, thats fine...
 
 		// TOOD: We must handle arrays here!
 
@@ -438,7 +437,7 @@ func alignVisit(ct *CType) Alignment {
 	if ct.ArraySize() > 0 {
 		rsize.ByteSize *= ct.ArraySize()
 	}
-	if ct.isSlice() {
+	if ct.IsSlice() {
 		// TODO: this is 64 bit only...
 		rsize.ByteSize = 8
 		rsize.ByteAlignment = 8
@@ -448,36 +447,19 @@ func alignVisit(ct *CType) Alignment {
 	return rsize
 }
 
-func findApiExportedTypes(inp Input) {
+func (types *Types) findApiExportedTypes(inp input.Input) {
 	for _, arg := range inp.Arguments {
-		exportType(arg.Ty)
+		types.exportType(arg.Ty)
 	}
 }
 
-func exportType(s string) {
+func (types *Types) exportType(s string) {
 	t := types.Get(s)
-	if t.apiType {
+	if t.Export {
 		return
 	}
-	t.apiType = true
-	for _, f := range t.cType.Fields {
-		exportType(f.Ty.ty.Name)
-	}
-}
-
-func (cf CField) CxxArrayLen() int {
-	rt := types.Get(cf.Ty.ty.Name)
-	if rt.CType().ArraySize() != cf.Ty.ArraySize() {
-		if rt.CType().ArraySize() != 0 {
-			size := cf.Ty.ArraySize() / rt.CType().ArraySize()
-			if size*rt.CType().ArraySize() != cf.Ty.ArraySize() {
-				panic("this cannot be an array, what is happening?")
-			}
-			return size
-		} else {
-			return cf.Ty.ArraySize()
-		}
-	} else {
-		return 0
+	t.Export = true
+	for _, f := range t.C.Fields {
+		types.exportType(f.Ty.GlslType.Name)
 	}
 }
