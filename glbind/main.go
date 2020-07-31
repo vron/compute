@@ -35,10 +35,10 @@ func main() {
 	ts := types.New(inp)
 
 	generateSharedH(inp, ts)
-	generateTypes(inp, ts)
-	generateComp(inp, ts)
-	generateAlignH(inp, ts)
-	generateGo(inp, ts)
+	//generateTypes(inp, ts)
+	//generateComp(inp, ts)
+	//generateAlignH(inp, ts)
+	//generateGo(inp, ts)
 }
 
 func expect(err error) {

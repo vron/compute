@@ -11,6 +11,8 @@ import (
 	"github.com/vron/compute/glbind/types"
 )
 
+// can we do this instead? static_assert( sizeof( double ) == sizeof( int64_t ), "" ) ;
+
 func generateAlignH(inp input.Input, ts *types.Types) {
 	f, err := os.Create(filepath.Join(fOut, "generated/align.hpp"))
 
@@ -39,8 +41,8 @@ func generateAlignH(inp input.Input, ts *types.Types) {
 	// ensure alignments of incoming pointers since provided by user
 	for _, a := range inp.Arguments {
 		cf := types.CField{
-			Name: a.Name,
-			Ty:   ts.MaybeCreateArrayType(a.Ty, a.Arrno),
+			Name:  a.Name,
+			CType: ts.MaybeCreateArrayType(a.Ty, a.Arrno),
 		}
 		recChecAlignment(buf, inp, cf, "d.")
 	}
@@ -51,16 +53,16 @@ func generateAlignH(inp input.Input, ts *types.Types) {
 }
 
 func recChecAlignment(buf *bufio.Writer, inp input.Input, cf types.CField, head string) {
-	if cf.Ty.IsSlice() {
+	if cf.CType.IsSlice() {
 		// this is a slice, will be provided as pointer so chec it
-		ai := cf.Ty.Size
+		ai := cf.CType.Size
 		msg := fmt.Sprintf("the argument %v provided was not aligned to a %v byte boundary as required", head+cf.Name, ai.ByteAlignment)
 		fmt.Fprintf(buf, "\tif((((uintptr_t)(const void *)(%v)) %% (%v)) != 0) { return this->set_error(EINVAL, \"%v\"); };\n", head+cf.Name, ai.ByteSize, msg)
 
 		return
 	}
 	// ensure all fields for structs
-	for _, f := range cf.Ty.Fields {
+	for _, f := range cf.CType.Fields {
 		recChecAlignment(buf, inp, f, head+cf.Name+".")
 	}
 }

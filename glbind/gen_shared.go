@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"text/tabwriter"
+
 	"github.com/vron/compute/glbind/input"
 	"github.com/vron/compute/glbind/types"
 )
@@ -57,13 +59,26 @@ struct cpt_error_t {
 
 `)
 
-	// Write all complex types
-	for _, st := range ts.ExportedStructTypes() {
-		fmt.Fprintf(buf, "typedef struct {\n")
-		for _, f := range st.CType().Fields {
-			buf.WriteString("  " + f.String() + ";\n")
+	// Write all exported types complete with alignment info for user reference.
+	// TODO: Add padding to all these such that hey actually get what we expect
+	for _, st := range ts.ListExportedTypes() {
+		if st.C.IsStruct() {
+			w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
+			fmt.Fprintf(buf, "typedef struct {  // size = %v, align = %v\n", st.C.Size.ByteSize, st.C.Size.ByteAlignment)
+			for _, f := range st.C.Struct.Fields {
+				fmt.Fprintf(w, "  "+f.CType.CString("cpt_", f.Name)+";\t// offset =\t%v\t\n", f.ByteOffset)
+			}
+			w.Flush()
+			fmt.Fprintf(buf, "} %v;\n\n", st.CName("cpt_"))
+		} else if st.C.IsVector() {
+			w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
+			fmt.Fprintf(w, "typedef struct {  // size = %v, align = %v\n", st.C.Size.ByteSize, st.C.Size.ByteAlignment)
+			for i := 0; i < st.C.Vector.Len; i++ {
+				fmt.Fprintf(w, "  %v\t%v;\t// offset =\t%v\t\n", st.C.Vector.Basic.CString("", ""), string('x'+i), st.C.Vector.Basic.Size.ByteSize*i)
+			}
+			w.Flush()
+			fmt.Fprintf(buf, "} %v;\n\n", st.CName("cpt_"))
 		}
-		fmt.Fprintf(buf, "} %v;\n\n", st.CType().Name)
 	}
 
 	// write the actually data we should export
@@ -75,11 +90,16 @@ struct cpt_error_t {
 */
 `)
 	buf.WriteString("typedef struct {\n")
+	w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
 	for _, arg := range inp.Arguments {
-		ty := ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)
-		cf := types.CField{Name: arg.Name, Ty: ty}
-		buf.WriteString("  " + cf.String() + ";\n")
+		ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
+		maybePointer := "*"
+		if ty.IsArray() && ty.Array.Len == -1 {
+			maybePointer = ""
+		}
+		fmt.Fprintf(w, "  "+ty.CString("cpt_", maybePointer+arg.Name)+";\n")
 	}
+	w.Flush()
 	buf.WriteString(`} cpt_data;
 
 /*

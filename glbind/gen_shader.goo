@@ -55,13 +55,13 @@ func generateComp(inp input.Input, ts *types.Types) {
 
 	// write all the globals we should be able to access
 	for _, arg := range inp.Arguments {
-		cf := types.CField{Name: arg.Name, Ty: ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)}
+		cf := types.CField{Name: arg.Name, CType: ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)}
 		fmt.Fprintf(buf, cf.CxxFieldString()+"\n")
 	}
 
 	// also write all the shared variabels we should be able to access
 	for _, arg := range inp.Shared {
-		cf := types.CField{Name: arg.Name, Ty: ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)}
+		cf := types.CField{Name: arg.Name, CType: ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)}
 		fmt.Fprintf(buf, cf.CxxFieldStringRef()+"\n")
 	}
 
@@ -122,7 +122,7 @@ func generateComp(inp input.Input, ts *types.Types) {
 func writeSharedStruct(buf io.Writer, inp input.Input, ts *types.Types) {
 	fmt.Fprintf(buf, "class  shared_data_t {\npublic:\n")
 	for _, arg := range inp.Shared {
-		cf := types.CField{Name: arg.Name, Ty: ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)}
+		cf := types.CField{Name: arg.Name, CType: ts.MaybeCreateArrayType(arg.Ty, arg.Arrno)}
 		fmt.Fprintf(buf, cf.CxxFieldString()+"\n")
 	}
 	fmt.Fprintf(buf, "} ;\n\n")
@@ -134,8 +134,8 @@ func generateSetData(buf *bufio.Writer, inp input.Input, ts *types.Types) {
 
 	for _, a := range inp.Arguments {
 		cf := types.CField{
-			Name: a.Name,
-			Ty:   ts.MaybeCreateArrayType(a.Ty, a.Arrno),
+			Name:  a.Name,
+			CType: ts.MaybeCreateArrayType(a.Ty, a.Arrno),
 		}
 		CxxBinding(cf, buf)
 	}

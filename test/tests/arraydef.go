@@ -29,6 +29,12 @@ layout(std430, set = 0, binding = 0) buffer In {
 	uint[1][2] a4;
 	uint[1][2] a5[3];
 	A[2] a6;
+	B[3] b1;
+};
+
+// TODO: actually test to access this one
+layout(std430, set = 0, binding = 0) buffer In2 {
+	B[][2] dInVec; // or lie this...
 };
 
 shared uint al1[2];

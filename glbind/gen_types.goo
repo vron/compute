@@ -434,22 +434,22 @@ func bVec(size int) func(InputArgument) string {
 */
 
 func CxxBinding(cf types.CField, buf io.Writer) {
-	if cf.Ty.IsSlice() {
+	if cf.CType.IsSlice() {
 		// slice type, the incomeing is *void and we assume everyhting is layed out, assign!
-		fmt.Fprintf(buf, "\tme->%v = (%v*)d.%v;\n", cf.Name, cf.Ty.GlslType.Name, cf.Name)
+		fmt.Fprintf(buf, "\tme->%v = (%v*)d.%v;\n", cf.Name, cf.CType.GlslType.Name, cf.Name)
 		return
 	}
-	if cf.Ty.ArraySize() == 0 && (len(cf.Ty.Fields) > 0 || cf.Ty.GlslType.Name == "mat2" || cf.Ty.GlslType.Name == "mat3" || cf.Ty.GlslType.Name == "mat4") {
+	if cf.CType.ArrayLen() == 0 && (len(cf.CType.Fields) > 0 || cf.CType.GlslType.Name == "mat2" || cf.CType.GlslType.Name == "mat3" || cf.CType.GlslType.Name == "mat4") {
 		// this is a struct, assign each one of them, this must be done recursively!
 		fmt.Fprintf(buf, "\tfrom_api(&(me->%v), d.%v);\n", cf.Name, cf.Name)
 		return
 	}
-	if cf.Ty.ArraySize() == 0 {
+	if cf.CType.ArrayLen() == 0 {
 		fmt.Fprintf(buf, "\tme->%v = d.%v;\n", cf.Name, cf.Name)
 		return
 	}
 
-	printArrayBinding(buf, cf, cf.Ty, []int{})
+	printArrayBinding(buf, cf, cf.CType, []int{})
 
 }
 
@@ -464,7 +464,7 @@ func printArrayBinding(buf io.Writer, cf types.CField, ty *types.CType, indices 
 		if len(ty.Fields) > 0 {
 			// this is a struct, assign each one of them, this must be done recursively!
 			fmt.Fprintf(buf, "\tfrom_api(&(me->%v%v), d.%v%v);\n", cf.Name, indexS, cf.Name, indexS)
-		} else if cf.Ty.GlslType.Name == "mat2" || cf.Ty.GlslType.Name == "mat3" || cf.Ty.GlslType.Name == "mat4" {
+		} else if cf.CType.GlslType.Name == "mat2" || cf.CType.GlslType.Name == "mat3" || cf.CType.GlslType.Name == "mat4" {
 			// binf it...
 			fmt.Fprintf(buf, "\tfrom_api(&(me->%v%v), &d.%v%v);// mat bind\n", cf.Name, indexS, cf.Name, indexS)
 		} else {
@@ -477,7 +477,7 @@ func printArrayBinding(buf io.Writer, cf types.CField, ty *types.CType, indices 
 
 	vecSize := ty.Array.Len
 	for i := 0; i < vecSize; i++ {
-		printArrayBinding(buf, cf, ty.Array.Ty, append(indices, i))
+		printArrayBinding(buf, cf, ty.Array.CType, append(indices, i))
 	}
 }
 
@@ -486,7 +486,6 @@ func generatefromapi(buf *bufio.Writer, inp input.Input, ts *types.Types) {
 	// Write implementation for the from api methods, copying field by field (rec if needed)
 	for _, s := range ts.ExportedStructTypes() {
 		fmt.Fprintf(buf, "void from_api(%v *me, %v d) {\n", s.Name, s.CType().Name)
-
 		for _, cf := range s.CType().Fields {
 			CxxBinding(cf, buf)
 		}

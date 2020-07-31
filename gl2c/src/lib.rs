@@ -153,6 +153,7 @@ pub fn visit_type_name(_s: &mut State, t: &syntax::TypeName) -> String {
 
 pub fn type_specifier_non_array(s: &mut State, t: &syntax::TypeSpecifierNonArray) -> String {
     let temp: String;
+    // TODO: should all these have a cptc_ prefix or such ? (also add to all methods?)
     String::from(match *t {
         syntax::TypeSpecifierNonArray::Void => "void",
         syntax::TypeSpecifierNonArray::Bool => "Bool",
