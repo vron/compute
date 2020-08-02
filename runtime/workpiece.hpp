@@ -7,10 +7,10 @@ class WorkPiece {
 public:
   uvec3 nwg;
   uvec3 gid;
-  cpt_data *data;
+  cptc_data *data;
   int generation;
   bool quit;
-  WorkPiece(uvec3 nwg, uvec3 gid, cpt_data *data, int generation)
+  WorkPiece(uvec3 nwg, uvec3 gid, cptc_data *data, int generation)
       : nwg(nwg), gid(gid), data(data), generation(generation), quit(false) {};
   WorkPiece(bool quit)
       : quit(quit) {};

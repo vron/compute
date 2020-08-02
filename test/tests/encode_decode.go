@@ -86,21 +86,21 @@ void main() {
 
 var ref Outer = Outer{
 	A:  true,
-	S1: S1{false},
-	B:  [4]float32{1, 2, 3, 4},
-	S2: S2{S1{true}},
-	S3: S3{[1]S1{S1{true}}},
-	C:  [4]float32{5, 6, 0, 0},
-	S4: S4{12, [2]int32{99, 89}},
-	S5: S5{S4{121, [2]int32{44, 55}}, true, S4{122, [2]int32{22, 2}}},
+	S1: S1{A: false},
+	B:  Mat2{Vec2{1, 2}, Vec2{3, 4}},
+	S2: S2{S1{A: true}},
+	S3: S3{[1]S1{S1{A: true}}},
+	C:  [2]Vec2{{5, 6}, {0, 0}},
+	S4: S4{P: 12, D: Ivec2{99, 89}},
+	S5: S5{A: S4{P: 121, D: Ivec2{44, 55}}, B: true, C: S4{P: 122, D: Ivec2{22, 2}}},
 	D:  3.3,
-	E:  [12]float32{-1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12},
-	S6: S6{[9]float32{10, 11, 12, 13, 14, 15, 16, 17, 18}},
+	E:  [3]Mat2{Mat2{Vec2{-1, -2}, Vec2{-3, -4}}, Mat2{Vec2{-5, -6}, Vec2{-7, -8}}, Mat2{Vec2{-9, -10}, Vec2{-11, -12}}},
+	S6: S6{M: Mat3{Vec3{10, 11, 12}, Vec3{13, 14, 15}, Vec3{16, 17, 18}}},
 }
 
 func TestEncodeDecode(t *testing.T) {
 	// create a struct that we will encode and decode to ensure it..
-	buf := make([]byte, ref.Stride())
+	buf := make([]byte, ref.Sizeof())
 	ref.Encode(buf)
 	var d Outer
 	(&d).Decode(buf)
@@ -113,22 +113,19 @@ func TestEncodeDecode(t *testing.T) {
 }
 
 func TestDecode(t *testing.T) {
-	buf := make([]byte, 2*ref.Stride())
-
-	// run the ernel
-
-	ensureRun(t, -1, Data{
-		Data: buf,
-		L:    ref,
-	}, 2, 1, 1)
-
-	for i := 0; i < 2; i++ {
-		var d Outer
-		(&d).Decode(buf[i*d.Stride():])
-		if !reflect.DeepEqual(ref, d) {
-			t.Error("encoded and decoded struct data not equal...", i)
-			t.Log(ref)
-			t.Log(d)
+	ensureRun(t, -1, 2, 1, 1, func() Data {
+		r := ref
+		return Data{
+			Data: make([]Outer, 2),
+			L:    &r,
 		}
-	}
+	}, func(res Data) {
+		for i := 0; i < 2; i++ {
+			if !reflect.DeepEqual(ref, res.Data[i]) {
+				t.Error("encoded and decoded struct data not equal...", i)
+				t.Log(ref)
+				t.Log(res.Data[i])
+			}
+		}
+	})
 }

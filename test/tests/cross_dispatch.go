@@ -1,10 +1,8 @@
 package kernel
 
 import (
-	"reflect"
 	"runtime"
 	"testing"
-	"unsafe"
 )
 
 var shader = `
@@ -50,8 +48,7 @@ func TestShader(t *testing.T) {
 }
 
 func test(t *testing.T) {
-	data := make([]int32, 64)
-	d := Data{Data: intToByte(data)}
+	d := Data{Data: make([]int32, 64)}
 	k, err := New(runtime.GOMAXPROCS(-1), 1024*1024)
 	if err != nil {
 		t.Error(err)
@@ -60,27 +57,19 @@ func test(t *testing.T) {
 	defer k.Free()
 
 	for i := 0; i < 10; i++ {
-		err := k.Dispatch(d, 1, 1, 1) // TODO: 8,8,8
+		err := k.Dispatch(d, 8, 8, 8)
 		if err != nil {
 			t.Error(err)
 		}
 	}
 
-	for i := range data {
+	for i := range d.Data {
 		ex := int32(1)
 		if i%2 == 0 {
 			ex = 5
 		}
-		if data[i] != ex {
-			t.Error(i, "expected value: ", ex, "got", data[i])
+		if d.Data[i] != ex {
+			t.Error(i, "expected value: ", ex, "got", d.Data[i])
 		}
 	}
-}
-
-func intToByte(raw []int32) []byte {
-	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
-	header.Len *= 4
-	header.Cap *= 4
-	data := *(*[]byte)(unsafe.Pointer(&header))
-	return data
 }

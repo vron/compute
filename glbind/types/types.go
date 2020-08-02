@@ -77,16 +77,27 @@ func (ts *Types) createBasicBuiltinTypes() {
 	ts.put(GlslType{Name: "uvec4", C: &CType{Vector: CVector{Len: 4, Basic: ts.Get("uint32_t").C}, Size: align(16, 16)}})
 
 	ts.put(GlslType{Name: "mat2", C: &CType{
-		Array: CArray{Len: 2, CType: ts.Get("vec2").C},
-		Size:  align(16, 8)}})
+		Struct: CStruct{Fields: []CField{
+			{Name: "column0", CType: ts.Get("vec2").C, ByteOffset: 0},
+			{Name: "column1", CType: ts.Get("vec2").C, ByteOffset: 8},
+		}},
+		Size: align(16, 8)}})
 	ts.put(GlslType{Name: "mat3", C: &CType{
-		Array: CArray{Len: 3, CType: ts.Get("vec3").C},
-		Size:  align(16*3, 16)}})
+		Struct: CStruct{Fields: []CField{
+			{Name: "column0", CType: ts.Get("vec3").C, ByteOffset: 0},
+			{Name: "column1", CType: ts.Get("vec3").C, ByteOffset: 16},
+			{Name: "column2", CType: ts.Get("vec3").C, ByteOffset: 16 * 2},
+		}},
+		Size: align(16*3, 16)}})
 	ts.put(GlslType{Name: "mat4", C: &CType{
-		Array: CArray{Len: 4, CType: ts.Get("vec4").C},
-		Size:  align(16*4, 16)}})
+		Struct: CStruct{Fields: []CField{
+			{Name: "column0", CType: ts.Get("vec4").C, ByteOffset: 0},
+			{Name: "column1", CType: ts.Get("vec4").C, ByteOffset: 16},
+			{Name: "column2", CType: ts.Get("vec4").C, ByteOffset: 16 * 2},
+			{Name: "column3", CType: ts.Get("vec4").C, ByteOffset: 16 * 3},
+		}},
+		Size: align(16*4, 16)}})
 }
-
 func (ts *Types) createComplexBuiltinTypes() {
 	ts.put(GlslType{Name: "image2Drgba32f", C: &CType{Struct: CStruct{
 		Fields: []CField{

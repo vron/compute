@@ -13,7 +13,7 @@ import (
 	"github.com/vron/compute/glbind/types"
 )
 
-func generateSharedH(inp input.Input, ts *types.Types) {
+func generateShared(inp input.Input, ts *types.Types) {
 	f, err := os.Create(filepath.Join(fOut, "generated/shared.h"))
 
 	if err != nil {
@@ -39,8 +39,9 @@ func generateSharedH(inp input.Input, ts *types.Types) {
 #define exported_func
 #endif
 
-#include "errno.h"
-#include "stdint.h"
+#include <errno.h>
+#include <stdint.h>
+#include <stdalign.h>
 
 /*
   cpt_error_t represents an error as reported from cpt_dispatch_kernel. The 
@@ -60,21 +61,35 @@ struct cpt_error_t {
 `)
 
 	// Write all exported types complete with alignment info for user reference.
-	// TODO: Add padding to all these such that hey actually get what we expect
+	// TODO: Add padding to all these such that they actually get what we expect
 	for _, st := range ts.ListExportedTypes() {
 		if st.C.IsStruct() {
 			w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
 			fmt.Fprintf(buf, "typedef struct {  // size = %v, align = %v\n", st.C.Size.ByteSize, st.C.Size.ByteAlignment)
-			for _, f := range st.C.Struct.Fields {
-				fmt.Fprintf(w, "  "+f.CType.CString("cpt_", f.Name)+";\t// offset =\t%v\t\n", f.ByteOffset)
+			offset := 0
+			for i, f := range st.C.Struct.Fields {
+				if offset != f.ByteOffset {
+					fmt.Fprintf(w, "  char\t _pad%v[%v];\t\t\t\n", i, f.ByteOffset-offset)
+				}
+				offset = f.ByteOffset
+				fmt.Fprintf(w, "  "+alignas(i, st.C.Size.ByteAlignment)+f.CType.CString("cpt_", f.Name, true)+";\t// offset =\t%v\t\n", f.ByteOffset)
+				offset += f.CType.Size.ByteSize
+			}
+			if offset != st.C.Size.ByteSize {
+				fmt.Fprintf(w, "  char\t _pad[%v];\t\t\t\n", st.C.Size.ByteSize-offset)
 			}
 			w.Flush()
 			fmt.Fprintf(buf, "} %v;\n\n", st.CName("cpt_"))
 		} else if st.C.IsVector() {
 			w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
 			fmt.Fprintf(w, "typedef struct {  // size = %v, align = %v\n", st.C.Size.ByteSize, st.C.Size.ByteAlignment)
+			offset := 0
 			for i := 0; i < st.C.Vector.Len; i++ {
-				fmt.Fprintf(w, "  %v\t%v;\t// offset =\t%v\t\n", st.C.Vector.Basic.CString("", ""), string('x'+i), st.C.Vector.Basic.Size.ByteSize*i)
+				fmt.Fprintf(w, "  %v%v\t%v;\t// offset =\t%v\t\n", alignas(i, st.C.Size.ByteAlignment), st.C.Vector.Basic.CString("", "", true), string('x'+i), st.C.Vector.Basic.Size.ByteSize*i)
+				offset += st.C.Vector.Basic.Size.ByteSize
+			}
+			if offset != st.C.Size.ByteSize {
+				fmt.Fprintf(w, "  char\t _pad[%v];\t\t\t\n", st.C.Size.ByteSize-offset)
 			}
 			w.Flush()
 			fmt.Fprintf(buf, "} %v;\n\n", st.CName("cpt_"))
@@ -93,11 +108,12 @@ struct cpt_error_t {
 	w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
 	for _, arg := range inp.Arguments {
 		ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
-		maybePointer := "*"
-		if ty.IsArray() && ty.Array.Len == -1 {
-			maybePointer = ""
+		name := arg.Name
+		if !(ty.IsArray() && ty.Array.Len == -1) {
+			name = "(*" + name + ")"
 		}
-		fmt.Fprintf(w, "  "+ty.CString("cpt_", maybePointer+arg.Name)+";\n")
+		fmt.Fprintf(w, "  "+ty.CString("cpt_", name, true)+";\n")
+		fmt.Fprintf(w, "  int64_t "+arg.Name+"_len;\n\n")
 	}
 	w.Flush()
 	buf.WriteString(`} cpt_data;
@@ -136,4 +152,11 @@ exported_func struct cpt_error_t cpt_dispatch_kernel(void *k, cpt_data d, int32_
 */
 exported_func void cpt_free_kernel(void *k);
 `)
+}
+
+func alignas(i, v int) string {
+	if i == 0 {
+		return fmt.Sprintf("alignas(%v) ", v)
+	}
+	return ""
 }

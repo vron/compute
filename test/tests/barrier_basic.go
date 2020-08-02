@@ -1,9 +1,7 @@
 package kernel
 
 import (
-	"reflect"
 	"testing"
-	"unsafe"
 )
 
 var shader = `
@@ -38,46 +36,25 @@ void main() {
 }
 `
 
-func TestShader(t *testing.T) {
-	// create the input data
-	din := make([]byte, 2*2*2*4)
-	dout := make([]byte, 2*2*2*4)
-	d := Data{Din: din, Dout: dout}
-	ensureRun(t, 1, d, 1, 1, 1)
-
-	out := unsafeToFloat(dout)
-	if len(out) != 8 {
-		t.Error("bad conversion")
-	}
-	for i := range out {
-		if out[i] != 200 {
-			t.Error(i, out[i], "!=", 200.0)
+func test(t *testing.T, nt int) {
+	ensureRun(t, nt, 1, 1, 1, func() Data {
+		return Data{
+			Din:  make([]float32, 8),
+			Dout: make([]float32, 8),
 		}
-	}
+	}, func(res Data) {
+		for i := range res.Dout {
+			if res.Dout[i] != 200 {
+				t.Error(i, res.Dout[i], "!=", 200.0)
+			}
+		}
+	})
+}
+
+func TestShader(t *testing.T) {
+	test(t, 1)
 }
 
 func TestShader3(t *testing.T) {
-	// create the input data
-	din := make([]byte, 2*2*2*4)
-	dout := make([]byte, 2*2*2*4)
-	d := Data{Din: din, Dout: dout}
-	ensureRun(t, 3, d, 1, 1, 1)
-
-	out := unsafeToFloat(dout)
-	if len(out) != 8 {
-		t.Error("bad conversion")
-	}
-	for i := range out {
-		if out[i] != 200 {
-			t.Error(i, out[i], "!=", 200.0)
-		}
-	}
-}
-
-func unsafeToFloat(raw []byte) []float32 {
-	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
-	header.Len /= 4
-	header.Cap /= 4
-	data := *(*[]float32)(unsafe.Pointer(&header))
-	return data
+	test(t, 3)
 }

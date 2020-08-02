@@ -1,10 +1,7 @@
 package kernel
 
 import (
-	"fmt"
-	"reflect"
 	"testing"
-	"unsafe"
 )
 
 var shader = `
@@ -34,27 +31,16 @@ void main() {
 func TestShader(t *testing.T) {
 	// run multiple times to try to fins scheduling problems
 	for i := 0; i < 1000; i++ {
-		fmt.Println(i)
 		runTest(t)
 	}
 }
 
 func runTest(t *testing.T) {
-	da := make([]uint32, 2)
-	db := make([]uint32, 2)
-	d := Data{Da: intToByte(db), Db: intToByte(db)}
-
-	ensureRun(t, -1, d, 200, 1, 1)
-
-	if da[0] != 2 {
-		t.Error("expected a 2: ", da[0])
-	}
-}
-
-func intToByte(raw []uint32) []byte {
-	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
-	header.Len *= 4
-	header.Cap *= 4
-	data := *(*[]byte)(unsafe.Pointer(&header))
-	return data
+	ensureRun(t, -1, 200, 1, 1, func() Data {
+		return Data{Da: make([]uint32, 3), Db: []uint32{0, 0}}
+	}, func(res Data) {
+		if res.Da[0] != 2 {
+			t.Error("expected a 2: ", res.Da[0])
+		}
+	})
 }

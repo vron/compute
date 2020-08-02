@@ -1,7 +1,6 @@
 package kernel
 
 import (
-	"encoding/binary"
 	"testing"
 )
 
@@ -16,10 +15,11 @@ layout(std430, set = 0, binding = 0) buffer Out {
 
 struct A {
 	int a[1][2];
+	int a1[1][2];
 };
 
 struct B {
-	vec3[2] b;
+	uvec3[2] b;
 };
 
 layout(std430, set = 0, binding = 0) buffer In {
@@ -30,11 +30,11 @@ layout(std430, set = 0, binding = 0) buffer In {
 	uint[1][2] a5[3];
 	A[2] a6;
 	B[3] b1;
+	B b2;
 };
 
-// TODO: actually test to access this one
 layout(std430, set = 0, binding = 0) buffer In2 {
-	B[][2] dInVec; // or lie this...
+	B[][2] dInVec;
 };
 
 shared uint al1[2];
@@ -72,7 +72,12 @@ void main() {
 	dout[++i] = a4[0][1];
 	dout[++i] = a5[2][0][1];
 	dout[++i] = a6[1].a[0][1];
+	dout[++i] = b1[1].b[0].y;
+	dout[++i] = b2.b[0].y;
 
+
+	/* test some complicated inputs handling */
+	dout[++i] = dInVec[1][0].b[0].x;
 
 	++i;
 	dout[i] = i;
@@ -80,27 +85,34 @@ void main() {
 `
 
 func TestShader(t *testing.T) {
-	nox := 5 + 6
-	d := Data{
-		Dout: make([]byte, (1+nox)*4),
-	}
-	d.A1 = 1
-	d.A2[0] = 1
-	d.A3[1] = 1
-	d.A4[0][1] = 1
-	d.A5[2][0][1] = 1
-	d.A6[1].A[0][1] = 1
+	nox := 5 + 8 + 1
 
-	ensureRun(t, 1, d, 1, 1, 1)
-
-	for i := 0; i < nox; i++ {
-		v := binary.LittleEndian.Uint32(d.Dout[i*4:])
-		if v != 1 {
-			t.Error(i, "should be 1 but found", v)
-		}
-	}
-	v := int(binary.LittleEndian.Uint32(d.Dout[nox*4:]))
-	if v != nox {
-		t.Error("wrong number of chcs: ", v, nox)
-	}
+	ensureRun(t, 1, 1, 1, 1,
+		func() Data {
+			ai := uint32(1)
+			return Data{
+				Dout:   make([]uint32, (1 + nox)),
+				A1:     &ai,
+				A2:     &[1]uint32{1},
+				A3:     &[2]uint32{0, 1},
+				A4:     &[1][2]uint32{{0, 1}},
+				A5:     &[3][1][2]uint32{{}, {}, {{0, 1}}},
+				A6:     &[2]A{{}, {A: [1][2]int32{{0, 1}}}},
+				B1:     &[3]B{{}, {B: [2]Uvec3{{0, 1, 0}}}},
+				B2:     &B{B: [2]Uvec3{{0, 1, 0}}},
+				DInVec: [][2]B{{}, {{B: [2]Uvec3{{1, 0, 0}}}}},
+			}
+		},
+		func(res Data) {
+			for i := 0; i < nox; i++ {
+				v := res.Dout[i]
+				if v != 1 {
+					t.Error(i, "should be 1 but found", v)
+				}
+			}
+			v := res.Dout[nox]
+			if v != uint32(nox) {
+				t.Error("wrong number of chcs: ", v, nox)
+			}
+		})
 }

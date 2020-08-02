@@ -49,12 +49,12 @@ what is going on is to start from the top level command:
 which runs all the tests and follow what it does (see also scripts/build.go).
 
 # TODO
+ - Only support little endian for now - if we want to handle big remember how to handle Bool type in go with direct casting!
  - Cross compile for all platforms from the Docker image.
  - Implement support for ARM64, Android, Linux
  - Add test cases for name collisions and fix the naming...
- - Gain more performance but letting the compiler now we have ensured all the alignments
  - Add pathological test cases such as wg size 0 etc. etc.
- - Document the alignment for []byte in both the C header and the go package.
  - Check if we have any problems with false sharing
  - When running the tests, first pre-build the headers to save time on each?
  - Variable sized stacs to avoid that as configuration? https://llvm.org/docs/SegmentedStacks.html
+ - Ref vec3's and https://stackoverflow.com/questions/23628259/how-to-properly-pad-and-align-data-in-opengl-for-std430-layout -  can we fully match the std430 so we are byte compatible? that would be good...

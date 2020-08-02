@@ -2,6 +2,7 @@
 
 #include "co/routines.hpp"
 #include "generated/shader.hpp"
+#include "generated/usertypes.hpp"
 #include "types/types.hpp"
 #include "waitgroup.hpp"
 #include "workpiece.hpp"
@@ -71,11 +72,10 @@ private:
     return r;
   };
 
-  // TODO: Make this one take reference instead.
-  bool ensure_alignments(cpt_data d);
+  bool ensure_alignments(cptc_data *d);
 
 public:
-  struct cpt_error_t dispatch(cpt_data d, int32_t nx, int32_t ny, int32_t nz) {
+  struct cpt_error_t dispatch(cptc_data *d, int32_t nx, int32_t ny, int32_t nz) {
     generation++;
     if (this->error_no)
       return this->error();
@@ -87,7 +87,7 @@ public:
     for (uint32_t gz = 0; gz < (uint32_t)nz; ++gz) {
       for (uint32_t gy = 0; gy < (uint32_t)ny; ++gy) {
         for (uint32_t gx = 0; gx < (uint32_t)nx; ++gx) {
-          queue.send(WorkPiece(nwg, make_uvec3(gx, gy, gz), &d, generation));
+          queue.send(WorkPiece(nwg, make_uvec3(gx, gy, gz), d, generation));
         }
       }
     }
