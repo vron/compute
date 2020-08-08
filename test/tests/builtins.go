@@ -21,6 +21,8 @@ layout(std430) buffer Out2 {
 void main() {
 	u[0] = floatBitsToUint(f[0]);
 	f[1] = uintBitsToFloat(u[1]);
+	f[2] = min(1.1, 2.2);
+	f[3] = max(1.1, 2.2);
 }
 `
 
@@ -28,7 +30,7 @@ func TestShader(t *testing.T) {
 	ensureRun(t, 1, 1, 1, 1,
 		func() Data {
 			return Data{
-				F: []float32{1.1, 1.2, 0},
+				F: []float32{1.1, 1.2, 0, 0},
 				U: []uint32{0, 3, 0},
 			}
 		},
@@ -38,6 +40,12 @@ func TestShader(t *testing.T) {
 			}
 			if math.Float32frombits(res.U[0]) != 1.1 {
 				t.Error("expected 1.1", res.U[0], math.Float32frombits(res.U[0]))
+			}
+			if res.F[2] != 1.1 {
+				t.Error("expected 1.1 for min", res.F[2])
+			}
+			if res.F[3] != 2.2 {
+				t.Error("expected 2.2 for max", res.F[3])
 			}
 		})
 }
