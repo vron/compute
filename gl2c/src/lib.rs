@@ -1353,16 +1353,42 @@ pub fn visit_selection_rest_statement(s: &mut State, sst: &syntax::SelectionRest
     }
 }
 
+pub fn is_case(_s: &mut State, st: &syntax::Statement) -> bool{
+    match *st {
+        syntax::Statement::Compound(ref _cst) => false,
+        syntax::Statement::Simple(ref sst) =>
+            match **sst {
+                syntax::SimpleStatement::CaseLabel(ref _cl) => true,
+                _ => false,
+            }
+    }
+}
+
+
 pub fn visit_switch_statement(s: &mut State, sst: &syntax::SwitchStatement) {
     let _ = write!(s, "{}", "switch (");
     visit_expr(s, &sst.head);
     let _ = write!(s, "{}", ") {\n");
 
+    let mut first = true;
     for st in &sst.body {
+        // adding a c scope in each case statement sine that is how i understand
+        // it wors in glsl, but maybe not fully true? So this code stuff is simply to 
+        // add a pair of bracets around to create a scope...
+       
+
+        // original was simply:
+        if is_case(s, st) && !first {
+            let _ = write!(s, "{}", "}");
+        }
         visit_statement(s, st);
+        if is_case(s, st) {
+            let _ = write!(s, "{}", "{");
+            first = false;
+        }
     }
 
-    let _ = write!(s, "{}", "}\n");
+    let _ = write!(s, "{}", "}}\n");
 }
 
 pub fn visit_case_label(s: &mut State, cl: &syntax::CaseLabel) {
