@@ -24,7 +24,7 @@ dependencies = [
 
 [[package]]
 name = "glsl"
-version = "4.1.1"
+version = "5.0.0"
 dependencies = [
  "nom",
 ]

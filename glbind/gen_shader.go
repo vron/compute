@@ -38,6 +38,13 @@ func generateShader(inp input.Input, ts *types.Types) {
 
 `, inp.Wg_size[0], inp.Wg_size[1], inp.Wg_size[2], inp.Wg_size[0]*inp.Wg_size[1]*inp.Wg_size[2])
 
+	fmt.Fprintf(buf, `
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-variable"
+
+`)
+
 	// ugly hac to manage array initialization of the shaders
 	fmt.Fprintf(buf, "#define _cpt_REPEAT_WG_SIZE(x) x")
 	for i := 1; i < inp.Wg_size[0]*inp.Wg_size[1]*inp.Wg_size[2]; i++ {
@@ -83,6 +90,9 @@ func generateShader(inp input.Input, ts *types.Types) {
 	fmt.Fprintf(buf, `
 };
 `)
+	fmt.Fprintf(buf, `
+#pragma clang diagnostic pop
+`)
 }
 
 func writeSharedStruct(buf io.Writer, inp input.Input, ts *types.Types) {
@@ -97,10 +107,6 @@ func writeSharedStruct(buf io.Writer, inp input.Input, ts *types.Types) {
 
 func writeConstructors(buf io.Writer, inp input.Input, ts *types.Types) {
 
-	fmt.Fprintf(buf, `
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-`)
 	fmt.Fprintf(buf, "  shader(cptc_data *d, shared_data_t *sd) ")
 	if len(inp.Shared)+len(inp.Arguments) > 0 {
 		fmt.Fprintf(buf, ":\n")
@@ -142,11 +148,8 @@ func writeConstructors(buf io.Writer, inp input.Input, ts *types.Types) {
 			}
 		}
 	}
-	fmt.Fprintf(buf, `{};
-#pragma clang diagnostic pop
-`)
 
-	fmt.Fprintf(buf, "\n")
+	fmt.Fprintf(buf, "{};\n\n")
 }
 
 func refify(s string) string {

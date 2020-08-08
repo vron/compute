@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -32,12 +33,15 @@ func generateTypes(inp input.Input, ts *types.Types) {
 	for _, st := range ts.ListExportedTypes() {
 		if st.C.IsStruct() && !st.Builtin {
 			w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
-			fmt.Fprintf(buf, "typedef struct {  // size = %v, align = %v\n", st.C.Size.ByteSize, st.C.Size.ByteAlignment)
+			fmt.Fprintf(buf, "struct %v {  // size = %v, align = %v\n", st.CName(CPTC), st.C.Size.ByteSize, st.C.Size.ByteAlignment)
 			for _, f := range st.C.Struct.Fields {
 				fmt.Fprintf(w, "  "+f.CType.CString(CPTC, f.Name, false)+";\t// offset =\t%v\t\n", f.ByteOffset)
 			}
 			w.Flush()
-			fmt.Fprintf(buf, "} %v;\n", st.CName(CPTC))
+
+			writeTypeConstructors(buf, st)
+
+			fmt.Fprintf(buf, "};\n")
 		}
 
 		// assert the sizes as we have the numbers
@@ -79,4 +83,64 @@ func generateTypes(inp input.Input, ts *types.Types) {
 	buf.WriteString("} cptc_data;\n")
 	fmt.Fprintf(buf, `static_assert (sizeof(cptc_data) == sizeof(cpt_data), "Size of cptc_data != cpt_data");%v`, "\n\n")
 
+}
+
+func hasField(fn string, ct *types.CType) bool {
+	if !ct.IsStruct() {
+		return false
+	}
+	for _, f := range ct.Struct.Fields {
+		if f.Name == fn {
+			return true
+		}
+	}
+	return false
+}
+
+func writeTypeConstructors(buf io.Writer, st *types.GlslType) {
+	// write function style constructors since they exist in glsl. Especially arrays are realy
+	// anoying since we have to provide them value by value?
+	fmt.Fprintf(buf, "%v() = default ;\n", st.CName(CPTC))
+	fmt.Fprintf(buf, "  %v(", st.CName(CPTC))
+	for i, f := range st.C.Struct.Fields {
+		// this is a bit subtle - we need to ensure we do not have a field of the
+		// same name as the struct as in that case we have to address it by struct begore
+		pre := CPTC
+		if hasField(f.Name, st.C) {
+			pre = "struct " + CPTC
+		}
+		fmt.Fprintf(buf, "%v", f.CType.CString(pre, f.Name, false))
+		if i != len(st.C.Struct.Fields)-1 {
+			fmt.Fprint(buf, ", ")
+		}
+	}
+	fmt.Fprintf(buf, ") : ")
+	for i, f := range st.C.Struct.Fields {
+		if f.CType.IsArray() {
+			// we need to write it all out? really? ( do we actually need to do this recursively?)
+			fmt.Fprintf(buf, "%v", f.Name)
+			recWriteConst(buf, f.CType, fmt.Sprintf("%v", f.Name))
+		} else {
+			fmt.Fprintf(buf, "%v(%v)", f.Name, f.Name)
+		}
+		if i != len(st.C.Struct.Fields)-1 {
+			fmt.Fprint(buf, ", ")
+		}
+	}
+	fmt.Fprintf(buf, " {};\n")
+}
+
+func recWriteConst(buf io.Writer, ct *types.CType, head string) {
+	if ct.IsArray() {
+		fmt.Fprintf(buf, "{")
+		for j := 0; j < ct.Array.Len; j++ {
+			recWriteConst(buf, ct.Array.CType, head+fmt.Sprintf("[%v]", j))
+			if j != ct.Array.Len-1 {
+				fmt.Fprint(buf, ", ")
+			}
+		}
+		fmt.Fprintf(buf, "}")
+	} else {
+		fmt.Fprintf(buf, head)
+	}
 }
