@@ -56,6 +56,18 @@ func (ct *CType) IsBasic() bool {
 	return ct.Basic.Name != ""
 }
 
+func (ct *CType) IsComplexStruct() bool {
+	if !ct.IsStruct() {
+		return false
+	}
+	for _, f := range ct.Struct.Fields {
+		if f.CType.IsArray() && f.CType.Array.Len == -1 {
+			return true
+		}
+	}
+	return false
+}
+
 func (ct *CType) CString(prefix, name string, prefixVectors bool) (s string) {
 	if ct.IsBasic() {
 		return ct.Basic.Name + "\t" + name

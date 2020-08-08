@@ -5,10 +5,8 @@ package kernel
 	launching wg's, syning etc.
 */
 import (
-	"reflect"
 	"runtime"
 	"testing"
-	"unsafe"
 )
 
 var shader = `
@@ -49,7 +47,7 @@ void main() {
 
 func BenchmarkScheduling(b *testing.B) {
 	data := make([]int32, 64*8*8*8*1024)
-	d := Data{Data: intToByte(data)}
+	d := Data{Data: data}
 	k, err := New(runtime.GOMAXPROCS(-1), 1024*1024)
 	if err != nil {
 		b.Error(err)
@@ -59,7 +57,7 @@ func BenchmarkScheduling(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		err := k.Dispatch(d, 8, 8, 8) // TODO: 8,8,8
+		err := k.Dispatch(d, 8, 8, 8)
 		if err != nil {
 			b.Error(err)
 		}
@@ -75,12 +73,4 @@ func BenchmarkScheduling(b *testing.B) {
 			b.Error(i, "expected value: ", ex, "got", data[i])
 		}
 	}
-}
-
-func intToByte(raw []int32) []byte {
-	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
-	header.Len *= 4
-	header.Cap *= 4
-	data := *(*[]byte)(unsafe.Pointer(&header))
-	return data
 }

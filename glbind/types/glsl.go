@@ -3,9 +3,10 @@ package types
 import "strings"
 
 type GlslType struct {
-	Name   string
-	Export bool
-	C      *CType
+	Name    string
+	Export  bool
+	Builtin bool
+	C       *CType
 }
 
 func (t GlslType) CName(prefix string) string {
@@ -14,7 +15,7 @@ func (t GlslType) CName(prefix string) string {
 
 func (t GlslType) GoName() string {
 	if t.Name == "Bool" {
-		return "bool"
+		return "Bool"
 	}
 	if t.Name == "uint32_t" {
 		return "uint32"

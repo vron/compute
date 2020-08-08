@@ -2,6 +2,7 @@ package types
 
 func align(s, a int) Alignment {
 	if s < 0 {
+		//return Alignment{ByteSize: 8, ByteAlignment: 8}
 		return Alignment{ByteSize: -s, ByteAlignment: a}
 	}
 	return Alignment{ByteSize: s, ByteAlignment: a}

@@ -1,9 +1,7 @@
 package kernel
 
 import (
-	"reflect"
 	"testing"
-	"unsafe"
 )
 
 var shader = `
@@ -47,22 +45,17 @@ void main() {
 `
 
 func TestShader(t *testing.T) {
-	data := make([]uint32, 20)
-	d := Data{Data: intToByte(data)}
-	ensureRun(t, -1, d, 1, 1, 1) // TODO: Testcase to ensure that the shared data is not shared between dispatches
 
-	if data[0] != 1 {
-		t.Error("not as expected")
-	}
-	if data[10] != 1 {
-		t.Error("not as expected")
-	}
-}
-
-func intToByte(raw []uint32) []byte {
-	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
-	header.Len *= 4
-	header.Cap *= 4
-	data := *(*[]byte)(unsafe.Pointer(&header))
-	return data
+	ensureRun(t, -1, 1, 1, 1, func() Data {
+		return Data{
+			Data: make([]uint32, 20),
+		}
+	}, func(res Data) {
+		if res.Data[0] != 1 {
+			t.Error("not as expected")
+		}
+		if res.Data[10] != 1 {
+			t.Error("not as expected")
+		}
+	})
 }

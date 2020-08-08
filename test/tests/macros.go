@@ -1,7 +1,6 @@
 package kernel
 
 import (
-	"encoding/binary"
 	"testing"
 )
 
@@ -24,19 +23,16 @@ void main() {
 `
 
 func TestShader(t *testing.T) {
-	data := make([]byte, 8)
-	d := Data{
-		Data: data,
-	}
-
-	ensureRun(t, 1, d, 1, 1, 1)
-
-	f1 := binary.LittleEndian.Uint32(data)
-	f2 := binary.LittleEndian.Uint32(data[4:])
-	if f1 != 1 {
-		t.Error("0 should be 1, ", f1)
-	}
-	if f2 != 2 {
-		t.Error("1 should be 2, ", f2)
-	}
+	ensureRun(t, 1, 1, 1, 1, func() Data {
+		return Data{
+			Data: make([]int32, 2),
+		}
+	}, func(res Data) {
+		if res.Data[0] != 1 {
+			t.Error("0 should be 1, ", res.Data[0])
+		}
+		if res.Data[1] != 2 {
+			t.Error("1 should be 2, ", res.Data[1])
+		}
+	})
 }

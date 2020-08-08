@@ -9,6 +9,9 @@ var shader = `
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 layout(rgba32f, binding = 0) uniform image2D img;
+layout(std430, set = 0, binding = 0) buffer In {
+	float din[];
+};
 
 void main() {
   vec4 pixel = vec4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -24,16 +27,19 @@ void main() {
 func TestShader(t *testing.T) {
 	// create the input data
 	nop := 2
-	img := make([]byte, 4*nop*nop*8*8*4+1)
 	d := Data{
 		Img: Image2Drgba32f{
-			// offset the data by 1 => should create alignment error
-			Data:  img[1:],
+			Data:  make([]float32, 4*nop*nop*8*8+1),
 			Width: int32(nop * 8),
 		},
+		Din: make([]float32, 10),
 	}
+	dr := encodeData(d)
+	dr.Din = dr.Din[1:] // should create alignemtn error
 
-	if run(t, 1, d, nop, nop, 1) == nil {
-		t.Error("expected alignment error, got no error")
+	k, _ := New(-1, -1)
+	defer k.Free()
+	if nil == k.DispatchRaw(dr, nop, nop, 1) {
+		t.Error("expected error")
 	}
 }

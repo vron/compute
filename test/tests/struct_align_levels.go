@@ -34,19 +34,18 @@ void main() {
 `
 
 func TestShader(t *testing.T) {
-	d := Data{
-		Index: 43,
-		Flag:  true,
-		Pos:   [3]float32{11, 22, 33},
-		Array: make([]byte, 100*Element{}.Stride()),
-	}
-
-	ensureRun(t, 1, d, 1, 1, 1)
-
-	// Decode the given element and verify
-	el := &Element{}
-	el.Decode(d.Array[el.Stride()*43:])
-	if el.Val != 109 {
-		t.Error("output not as expected")
-	}
+	ensureRun(t, 1, 1, 1, 1, func() Data {
+		ft := int32(43)
+		tb := True
+		return Data{
+			Index: &ft,
+			Flag:  &tb,
+			Pos:   &Vec3{11, 22, 33},
+			Array: make([]Element, 100),
+		}
+	}, func(res Data) {
+		if res.Array[43].Val != 109 {
+			t.Error("output not as expected")
+		}
+	})
 }

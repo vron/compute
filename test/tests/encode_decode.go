@@ -85,14 +85,14 @@ void main() {
 // Todo, change the above to also copy over one struct from the input to the output
 
 var ref Outer = Outer{
-	A:  true,
-	S1: S1{A: false},
+	A:  True,
+	S1: S1{A: False},
 	B:  Mat2{Vec2{1, 2}, Vec2{3, 4}},
-	S2: S2{S1{A: true}},
-	S3: S3{[1]S1{S1{A: true}}},
+	S2: S2{S1{A: True}},
+	S3: S3{[1]S1{S1{A: True}}},
 	C:  [2]Vec2{{5, 6}, {0, 0}},
 	S4: S4{P: 12, D: Ivec2{99, 89}},
-	S5: S5{A: S4{P: 121, D: Ivec2{44, 55}}, B: true, C: S4{P: 122, D: Ivec2{22, 2}}},
+	S5: S5{A: S4{P: 121, D: Ivec2{44, 55}}, B: True, C: S4{P: 122, D: Ivec2{22, 2}}},
 	D:  3.3,
 	E:  [3]Mat2{Mat2{Vec2{-1, -2}, Vec2{-3, -4}}, Mat2{Vec2{-5, -6}, Vec2{-7, -8}}, Mat2{Vec2{-9, -10}, Vec2{-11, -12}}},
 	S6: S6{M: Mat3{Vec3{10, 11, 12}, Vec3{13, 14, 15}, Vec3{16, 17, 18}}},

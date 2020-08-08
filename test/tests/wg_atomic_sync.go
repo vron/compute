@@ -1,9 +1,7 @@
 package kernel
 
 import (
-	"reflect"
 	"testing"
-	"unsafe"
 )
 
 var shader = `
@@ -34,29 +32,21 @@ void main() {
 `
 
 func TestShader(t *testing.T) {
-	// create the input data
-	values := make([]int32, 144)
-	mysum := make([]int32, 2)
-	for i := range values {
-		values[i] = 1
-	}
-	d := Data{Values: intToByte(values), Mysum: intToByte(mysum)}
-	ensureRun(t, -1, d, 2, 3, 4) // 6*4 = 24 * 6 = 144
-
-	for i := range values {
-		if values[i] != 1 {
-			t.Error(i, values[i], "!=", 1)
+	ensureRun(t, -1, 2, 3, 4, func() Data {
+		values := make([]int32, 144)
+		mysum := make([]int32, 2)
+		for i := range values {
+			values[i] = 1
 		}
-	}
-	if mysum[0] != 144 {
-		t.Error("sum not 144", mysum)
-	}
-}
-
-func intToByte(raw []int32) []byte {
-	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
-	header.Len *= 4
-	header.Cap *= 4
-	data := *(*[]byte)(unsafe.Pointer(&header))
-	return data
+		return Data{Values: values, Mysum: mysum}
+	}, func(res Data) {
+		for i := range res.Values {
+			if res.Values[i] != 1 {
+				t.Error(i, res.Values[i], "!=", 1)
+			}
+		}
+		if res.Mysum[0] != 144 {
+			t.Error("sum not 144", res.Mysum)
+		}
+	})
 }

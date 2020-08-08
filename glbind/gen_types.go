@@ -30,7 +30,7 @@ func generateTypes(inp input.Input, ts *types.Types) {
 	// and alignments, similiarly chec the shared ones here since we do not want to polute the shared.h
 	// file with all that info.
 	for _, st := range ts.ListExportedTypes() {
-		if st.C.IsStruct() && st.Name != "mat2" && st.Name != "mat3" && st.Name != "mat4" {
+		if st.C.IsStruct() && !st.Builtin {
 			w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
 			fmt.Fprintf(buf, "typedef struct {  // size = %v, align = %v\n", st.C.Size.ByteSize, st.C.Size.ByteAlignment)
 			for _, f := range st.C.Struct.Fields {
@@ -64,12 +64,16 @@ func generateTypes(inp input.Input, ts *types.Types) {
 	w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
 	for _, arg := range inp.Arguments {
 		ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
-		name := arg.Name
-		if !(ty.IsArray() && ty.Array.Len == -1) {
-			name = "(*" + name + ")"
+		if ty.IsComplexStruct() {
+			fmt.Fprintf(w, "  "+ty.CString("", arg.Name, true)+";\n")
+		} else {
+			name := arg.Name
+			if !(ty.IsArray() && ty.Array.Len == -1) {
+				name = "(*" + name + ")"
+			}
+			fmt.Fprintf(w, "  "+ty.CString(CPTC, name, false)+";\n")
+			fmt.Fprintf(w, "  int64_t "+arg.Name+"_len;\n\n")
 		}
-		fmt.Fprintf(w, "  "+ty.CString(CPTC, name, false)+";\n")
-		fmt.Fprintf(w, "  int64_t "+arg.Name+"_len;\n\n")
 	}
 	w.Flush()
 	buf.WriteString("} cptc_data;\n")

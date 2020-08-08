@@ -71,6 +71,7 @@ func freeKernel(k *Kernel) {
 `)
 
 	writeTypeDefinitions(buf, inp, ts)
+	writeTypeDefinitionsToC(buf, inp, ts)
 	writeDataStruct(buf, inp, ts)
 	writeDataStructRaw(buf, inp, ts)
 	writeDispatch(buf, inp, ts)
@@ -80,26 +81,6 @@ func freeKernel(k *Kernel) {
 	writeDecode(buf, inp, ts)
 	writeEnsureAlign(buf, inp, ts)
 	writeSupportFuncs(buf, inp, ts)
-	/*
-		// Also create the Encode Decode Methods for types that are referred in arrays
-		fmt.Fprintf(buf,"var bo = binary.LittleEndian\n\n")
-
-		for _, st := range ts.ExportedStructTypes() {
-			if st.UserDefined {
-				fmt.Fprintf(buf, "func (d %v) Stride() int { return %v }\n", st.GoName(), st.CType().Size.ByteSize)
-				fmt.Fprintf(buf, "func (d %v) Alignment() int { return %v }\n\n", st.GoName(), st.CType().Size.ByteAlignment)
-
-				// Create a Encode function for the element
-				fmt.Fprintf(buf, "func (e *%v) Encode(d []byte) {\n", st.GoName())
-				printStructEncodes(buf, 0, st, "")
-				fmt.Fprintf(buf,"}\n\n")
-				// Create a Decode function for the element
-				fmt.Fprintf(buf, "func (e *%v) Decode(d []byte) {\n", st.GoName())
-				printStructDecodes(buf, 0, st, "")
-				fmt.Fprintf(buf,"}\n\n")
-			}
-		}
-	*/
 }
 
 func writePreamble(buf io.Writer, inp input.Input, ts *types.Types) {
@@ -109,20 +90,27 @@ func writePreamble(buf io.Writer, inp input.Input, ts *types.Types) {
 #cgo windows LDFLAGS: -L. -lshader
 
 #include "shared.h"
-
 `)
 	fmt.Fprintf(buf, `struct cpt_error_t wrap_dispatch(void *k, `+"\n")
 	tab := "                                 "
 	for _, arg := range inp.Arguments {
-		fmt.Fprintf(buf, tab+"void* "+arg.Name+", ")
-		fmt.Fprintf(buf, "int64_t "+arg.Name+"_len,\n")
+		ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
+		if ty.IsComplexStruct() {
+			fmt.Fprintf(buf, tab+ty.CString("cpt_", "", false)+" "+arg.Name+",\n")
+		} else {
+			fmt.Fprintf(buf, tab+"void* "+arg.Name+", ")
+			fmt.Fprintf(buf, "int64_t "+arg.Name+"_len,\n")
+		}
 	}
 	fmt.Fprintf(buf, tab+`int32_t x, int32_t y, int32_t z) {
 	cpt_data d;
 `)
 	for _, arg := range inp.Arguments {
+		ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
 		fmt.Fprintf(buf, "\td."+arg.Name+" = "+arg.Name+";\n")
-		fmt.Fprintf(buf, "\td."+arg.Name+"_len = "+arg.Name+"_len;\n")
+		if !ty.IsComplexStruct() {
+			fmt.Fprintf(buf, "\td."+arg.Name+"_len = "+arg.Name+"_len;\n")
+		}
 	}
 	fmt.Fprintf(buf, `	return cpt_dispatch_kernel(k, d, x, y, z);
 }
@@ -135,6 +123,11 @@ import "C"
 func writeTypeDefinitions(buf io.Writer, inp input.Input, ts *types.Types) {
 	for _, st := range ts.ListExportedTypes() {
 		if st.C.IsBasic() {
+			if st.Name == "Bool" {
+				fmt.Fprintf(buf, "type Bool struct{ B bool\n_ [3]bool}\n\n")
+				fmt.Fprintf(buf, "var True = Bool{B: true}\n\n")
+				fmt.Fprintf(buf, "var False = Bool{}\n\n")
+			}
 			// do nothing, we use built in go types here
 		} else if st.C.IsVector() {
 			fmt.Fprintf(buf, "type %v [%v]%v\n\n", st.GoName(), st.C.Size.ByteSize/st.C.Vector.Basic.Size.ByteSize, st.C.Vector.Basic.GlslType.GoName())
@@ -147,10 +140,8 @@ func writeTypeDefinitions(buf io.Writer, inp input.Input, ts *types.Types) {
 				}
 				offset = f.ByteOffset
 				fmt.Fprintf(buf, "  "+f.CType.GoString(strings.Title(f.Name))+"\n")
-				// we need to special case bool since that is the only basic type we cannot
-				// map  1-1 since it is one byte in go and 4 in glsl / c imple
-				if f.CType.IsBasic() && f.CType.GlslType.Name == "Bool" {
-					offset += 1
+				if f.CType.IsArray() && f.CType.Array.Len == -1 {
+					offset += 8 * 3 // a slice has pointer, cap and lenb: TODO: 32bit
 				} else {
 					offset += f.CType.Size.ByteSize
 				}
@@ -159,10 +150,28 @@ func writeTypeDefinitions(buf io.Writer, inp input.Input, ts *types.Types) {
 				fmt.Fprintf(buf, "\t_\t[%v]byte\n", st.C.Size.ByteSize-offset)
 			}
 			fmt.Fprintf(buf, "}\n\n")
-
 		} else {
 			panic("cannot have an exported array type? what happened?")
 		}
+	}
+}
+
+func writeTypeDefinitionsToC(buf io.Writer, inp input.Input, ts *types.Types) {
+	for _, st := range ts.ListExportedTypes() {
+		if !st.C.IsComplexStruct() {
+			continue
+		}
+		fmt.Fprintf(buf, "func (v %v) toC() C.cpt_%v {\nreturn C.cpt_%v{\n", st.GoName(), st.Name, st.Name)
+		for _, f := range st.C.Struct.Fields {
+			if f.CType.IsArray() && f.CType.Array.Len == -1 {
+				// C expects only a pointer TODO: Should we also send a length here?
+				fmt.Fprintf(buf, "%v:(*C.%v)(&v.%v[0]),\n", f.Name, f.CType.Array.CType.Basic.Name, strings.Title(f.Name))
+			} else {
+				fmt.Fprintf(buf, "%v:(C.%v)(v.%v),\n", f.Name, f.CType.Basic.Name, strings.Title(f.Name))
+			}
+		}
+		fmt.Fprintf(buf, "}\n}\n\n")
+
 	}
 }
 
@@ -173,7 +182,11 @@ func writeDataStruct(buf io.Writer, inp input.Input, ts *types.Types) {
 		if len(arg.Arrno) > 0 && arg.Arrno[0] == -1 {
 			fmt.Fprintf(buf, "  "+ty.GoString(strings.Title(arg.Name))+"\n")
 		} else {
-			fmt.Fprintf(buf, "  "+pointify(ty.GoString(strings.Title(arg.Name)))+"\n")
+			if ty.IsComplexStruct() {
+				fmt.Fprintf(buf, "  "+(ty.GoString(strings.Title(arg.Name)))+"\n")
+			} else {
+				fmt.Fprintf(buf, "  "+pointify(ty.GoString(strings.Title(arg.Name)))+"\n")
+			}
 		}
 	}
 	fmt.Fprintf(buf, "}\n\n")
@@ -182,7 +195,13 @@ func writeDataStruct(buf io.Writer, inp input.Input, ts *types.Types) {
 func writeDataStructRaw(buf io.Writer, inp input.Input, ts *types.Types) {
 	fmt.Fprintf(buf, "type DataRaw struct {\n")
 	for _, arg := range inp.Arguments {
-		fmt.Fprintf(buf, strings.Title(arg.Name)+" []byte\n")
+		ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
+		if ty.IsComplexStruct() {
+			// this is the sort of complex struct that is handled completely differently in gl anyway
+			fmt.Fprintf(buf, "  "+(ty.GoString(strings.Title(arg.Name)))+"\n")
+		} else {
+			fmt.Fprintf(buf, strings.Title(arg.Name)+" []byte\n")
+		}
 	}
 	fmt.Fprintf(buf, "}\n\n")
 }
@@ -198,16 +217,22 @@ func (k *Kernel) Dispatch(bind Data, numGroupsX, numGroupsY, numGroupsZ int) err
 		panic("cannot use a Kernel where Free() has been called")
 	}
 `)
+
 	fmt.Fprintf(buf, ` errno := C.wrap_dispatch(k.k,
 `)
 	for _, arg := range inp.Arguments {
+		ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
 		if len(arg.Arrno) > 0 && arg.Arrno[0] == -1 {
 			// slice data, we need the size of the entire thing...
 			fmt.Fprintf(buf, "\tunsafe.Pointer(&bind."+strings.Title(arg.Name)+"[0]), ")
 			fmt.Fprintf(buf, "C.int64_t(int64(len(bind.%v))*int64(unsafe.Sizeof(bind.%v[0]))),\n", strings.Title(arg.Name), strings.Title(arg.Name))
 		} else {
-			fmt.Fprintf(buf, "\tunsafe.Pointer(bind."+strings.Title(arg.Name)+"), ")
-			fmt.Fprintf(buf, "C.int64_t(unsafe.Sizeof(*bind."+strings.Title(arg.Name)+")),\n")
+			if ty.IsComplexStruct() {
+				fmt.Fprintf(buf, "\tbind."+strings.Title(arg.Name)+".toC(), ")
+			} else {
+				fmt.Fprintf(buf, "\tunsafe.Pointer(bind."+strings.Title(arg.Name)+"), ")
+				fmt.Fprintf(buf, "C.int64_t(unsafe.Sizeof(*bind."+strings.Title(arg.Name)+")),\n")
+			}
 		}
 	}
 	fmt.Fprintf(buf, `C.int(numGroupsX), C.int(numGroupsY), C.int(numGroupsZ))`)
@@ -233,8 +258,13 @@ func (k *Kernel) DispatchRaw(bind DataRaw, numGroupsX, numGroupsY, numGroupsZ in
 	fmt.Fprintf(buf, ` errno := C.wrap_dispatch(k.k,
 `)
 	for _, arg := range inp.Arguments {
-		fmt.Fprintf(buf, "\tunsafe.Pointer(&bind."+strings.Title(arg.Name)+"[0]), ")
-		fmt.Fprintf(buf, "C.int64_t(int64(len(bind.%v))),\n", strings.Title(arg.Name))
+		ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
+		if ty.IsComplexStruct() {
+			fmt.Fprintf(buf, "\tbind."+strings.Title(arg.Name)+".toC(), ")
+		} else {
+			fmt.Fprintf(buf, "\tunsafe.Pointer(&bind."+strings.Title(arg.Name)+"[0]), ")
+			fmt.Fprintf(buf, "C.int64_t(int64(len(bind.%v))),\n", strings.Title(arg.Name))
+		}
 	}
 	fmt.Fprintf(buf, `C.int(numGroupsX), C.int(numGroupsY), C.int(numGroupsZ))`)
 
@@ -311,8 +341,8 @@ func writeSizeAlign(buf io.Writer, inp input.Input, ts *types.Types) {
 	for _, st := range ts.ListExportedTypes() {
 		if st.C.IsBasic() {
 		} else if st.C.IsVector() || st.C.IsStruct() {
-			fmt.Fprintf(buf, "func (v *%v) Alignof() int { return %v }\n\n", st.GoName(), st.C.Size.ByteAlignment)
-			fmt.Fprintf(buf, "func (v *%v) Sizeof() int { return %v }\n\n", st.GoName(), st.C.Size.ByteSize)
+			fmt.Fprintf(buf, "func (v %v) Alignof() int { return %v }\n\n", st.GoName(), st.C.Size.ByteAlignment)
+			fmt.Fprintf(buf, "func (v %v) Sizeof() int { return %v }\n\n", st.GoName(), st.C.Size.ByteSize)
 		} else {
 			panic("cannot have an exported array type? what happened?")
 		}
@@ -322,7 +352,7 @@ func writeSizeAlign(buf io.Writer, inp input.Input, ts *types.Types) {
 func writeSingle(buf io.Writer, parentPos string, ty *types.GlslType, head string) {
 	switch ty.Name {
 	case "Bool":
-		fmt.Fprintf(buf, "\tbo.PutUint32(%v, uint32(cBool(%v)))\n", parentPos, head)
+		fmt.Fprintf(buf, "\tbo.PutUint32(%v, uint32(cBool((%v).B)))\n", parentPos, head)
 	case "float":
 		fmt.Fprintf(buf, "\tbo.PutUint32(%v, math.Float32bits(%v))\n", parentPos, head)
 	case "int32_t":
@@ -373,7 +403,6 @@ func writeEncode(buf io.Writer, inp input.Input, ts *types.Types) {
 				if f.CType.IsBasic() || f.CType.IsStruct() || f.CType.IsVector() {
 					writeSingle(buf, fmt.Sprintf("d[%v:]", f.ByteOffset), f.CType.GlslType, "v."+strings.Title(f.Name))
 				} else if f.CType.IsArray() {
-					// this one can be multiple levels, but cannot be -1 here
 					recEncodeArray(buf, 0, f.CType, fmt.Sprint(f.ByteOffset), "v."+strings.Title(f.Name), "d")
 				}
 			}
@@ -387,7 +416,9 @@ func writeEncode(buf io.Writer, inp input.Input, ts *types.Types) {
 	fmt.Fprintf(buf, "func encodeData(v Data) (r DataRaw) {\n")
 	for _, arg := range inp.Arguments {
 		ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
-		if ty.IsBasic() {
+		if ty.IsComplexStruct() {
+			fmt.Fprintf(buf, "  r.%v =v.%v\n", strings.Title(arg.Name), strings.Title(arg.Name))
+		} else if ty.IsBasic() {
 			fmt.Fprintf(buf, "  r.%v = AlignedSlice(%v, %v)\n", strings.Title(arg.Name), ty.Size.ByteSize, ty.Size.ByteAlignment)
 			writeSingle(buf, fmt.Sprintf("r.%v", strings.Title(arg.Name)), ty.GlslType, "*v."+strings.Title(arg.Name))
 		} else if ty.IsStruct() || ty.IsVector() {
@@ -408,7 +439,7 @@ func writeEncode(buf io.Writer, inp input.Input, ts *types.Types) {
 func readSingle(buf io.Writer, parentPos string, ty *types.GlslType, head string) {
 	switch ty.Name {
 	case "Bool":
-		fmt.Fprintf(buf, "\t%v = iBool(bo.Uint32(%v))\n", head, parentPos)
+		fmt.Fprintf(buf, "\t%v = Bool{B: iBool(bo.Uint32(%v))}\n", head, parentPos)
 	case "float":
 		fmt.Fprintf(buf, "\t%v = math.Float32frombits(bo.Uint32(%v))\n", head, parentPos)
 	case "int32_t":
@@ -473,7 +504,9 @@ func writeDecode(buf io.Writer, inp input.Input, ts *types.Types) {
 	fmt.Fprintf(buf, "func decodeData(r DataRaw) (d Data) {\n")
 	for i, arg := range inp.Arguments {
 		ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
-		if ty.IsBasic() {
+		if ty.IsComplexStruct() {
+			fmt.Fprintf(buf, "  d.%v =r.%v\n", strings.Title(arg.Name), strings.Title(arg.Name))
+		} else if ty.IsBasic() {
 			readSingle(buf, fmt.Sprintf("r.%v", strings.Title(arg.Name)), ty.GlslType, fmt.Sprintf("var t%v %v", i, ty.GlslType.GoName()))
 			fmt.Fprintf(buf, "d.%v = &t%v\n", strings.Title(arg.Name), i)
 		} else if ty.IsStruct() || ty.IsVector() {

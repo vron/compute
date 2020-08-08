@@ -73,7 +73,12 @@ struct cpt_error_t {
 				}
 				offset = f.ByteOffset
 				fmt.Fprintf(w, "  "+alignas(i, st.C.Size.ByteAlignment)+f.CType.CString("cpt_", f.Name, true)+";\t// offset =\t%v\t\n", f.ByteOffset)
-				offset += f.CType.Size.ByteSize
+				if f.CType.IsArray() && f.CType.Array.Len == -1 {
+					// should be a pointer: TODO: 32bit
+					offset += 8
+				} else {
+					offset += f.CType.Size.ByteSize
+				}
 			}
 			if offset != st.C.Size.ByteSize {
 				fmt.Fprintf(w, "  char\t _pad[%v];\t\t\t\n", st.C.Size.ByteSize-offset)
@@ -85,7 +90,7 @@ struct cpt_error_t {
 			fmt.Fprintf(w, "typedef struct {  // size = %v, align = %v\n", st.C.Size.ByteSize, st.C.Size.ByteAlignment)
 			offset := 0
 			for i := 0; i < st.C.Vector.Len; i++ {
-				fmt.Fprintf(w, "  %v%v\t%v;\t// offset =\t%v\t\n", alignas(i, st.C.Size.ByteAlignment), st.C.Vector.Basic.CString("", "", true), string('x'+i), st.C.Vector.Basic.Size.ByteSize*i)
+				fmt.Fprintf(w, "  %v%v\t%v;\t// offset =\t%v\t\n", alignas(i, st.C.Size.ByteAlignment), st.C.Vector.Basic.CString("", "", true), comp(i), st.C.Vector.Basic.Size.ByteSize*i)
 				offset += st.C.Vector.Basic.Size.ByteSize
 			}
 			if offset != st.C.Size.ByteSize {
@@ -108,12 +113,16 @@ struct cpt_error_t {
 	w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
 	for _, arg := range inp.Arguments {
 		ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
-		name := arg.Name
-		if !(ty.IsArray() && ty.Array.Len == -1) {
-			name = "(*" + name + ")"
+		if ty.IsComplexStruct() {
+			fmt.Fprintf(w, "  "+ty.CString("cpt_", arg.Name, true)+";\n")
+		} else {
+			name := arg.Name
+			if !(ty.IsArray() && ty.Array.Len == -1) {
+				name = "(*" + name + ")"
+			}
+			fmt.Fprintf(w, "  "+ty.CString("cpt_", name, true)+";\n")
+			fmt.Fprintf(w, "  int64_t "+arg.Name+"_len;\n\n")
 		}
-		fmt.Fprintf(w, "  "+ty.CString("cpt_", name, true)+";\n")
-		fmt.Fprintf(w, "  int64_t "+arg.Name+"_len;\n\n")
 	}
 	w.Flush()
 	buf.WriteString(`} cpt_data;
@@ -159,4 +168,19 @@ func alignas(i, v int) string {
 		return fmt.Sprintf("alignas(%v) ", v)
 	}
 	return ""
+}
+
+func comp(i int) string {
+	switch i {
+	case 0:
+		return "x"
+	case 1:
+		return "y"
+	case 2:
+		return "z"
+	case 3:
+		return "w"
+	default:
+		return "{" // this will for sure generate cmpilation errors...
+	}
 }

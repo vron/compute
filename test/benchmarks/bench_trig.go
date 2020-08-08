@@ -6,11 +6,9 @@ package kernel
 */
 import (
 	"math"
-	"reflect"
 	"runtime"
 	"sync"
 	"testing"
-	"unsafe"
 )
 
 var shader = `
@@ -59,7 +57,7 @@ func BenchmarkTrig(b *testing.B) {
 	}
 	dout := make([]float32, 64*1024*24)
 
-	d := Data{Din: floatToByte(din), Dout: floatToByte(dout)}
+	d := Data{Din: (din), Dout: (dout)}
 	k, err := New(runtime.GOMAXPROCS(-1), 1024*1024)
 	if err != nil {
 		b.Error(err)
@@ -131,12 +129,4 @@ func refImpl(dout, din []float32) {
 		si = ei
 	}
 	wg.Wait()
-}
-
-func floatToByte(raw []float32) []byte {
-	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
-	header.Len *= 4
-	header.Cap *= 4
-	data := *(*[]byte)(unsafe.Pointer(&header))
-	return data
 }

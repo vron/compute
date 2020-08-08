@@ -105,8 +105,9 @@ func writeConstructors(buf io.Writer, inp input.Input, ts *types.Types) {
 	if len(inp.Shared)+len(inp.Arguments) > 0 {
 		fmt.Fprintf(buf, ":\n")
 		for i, arg := range inp.Arguments {
+			ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
 			deref := "*"
-			if len(arg.Arrno) > 0 && arg.Arrno[0] == -1 {
+			if (len(arg.Arrno) > 0 && arg.Arrno[0] == -1) || ty.IsComplexStruct() {
 				deref = ""
 			}
 			fmt.Fprintf(buf, "        %v(%v(d->%v))", arg.Name, deref, arg.Name)

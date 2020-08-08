@@ -6,7 +6,8 @@
 
 struct image2Drgba32f {
   float *data;
-  int width;
+  char padd[20];
+  int32_t width;
 };
 
 void always_inline imageStore(image2Drgba32f image, ivec2 P, vec4 data) {
