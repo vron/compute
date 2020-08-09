@@ -23,6 +23,7 @@ void main() {
 	f[1] = uintBitsToFloat(u[1]);
 	f[2] = min(1.1, 2.2);
 	f[3] = max(1.1, 2.2);
+	f[4] = mix(vec2(8,0), vec2(10,0), 0.5).x;
 }
 `
 
@@ -30,8 +31,8 @@ func TestShader(t *testing.T) {
 	ensureRun(t, 1, 1, 1, 1,
 		func() Data {
 			return Data{
-				F: []float32{1.1, 1.2, 0, 0},
-				U: []uint32{0, 3, 0},
+				F: []float32{1.1, 1.2, 0, 0, 0},
+				U: []uint32{0, 3, 0, 0},
 			}
 		},
 		func(res Data) {
@@ -46,6 +47,9 @@ func TestShader(t *testing.T) {
 			}
 			if res.F[3] != 2.2 {
 				t.Error("expected 2.2 for max", res.F[3])
+			}
+			if res.F[4] != 9 { // mix
+				t.Error("expected 9 for mix", res.F[4])
 			}
 		})
 }
