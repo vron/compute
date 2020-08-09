@@ -48,6 +48,9 @@ impl fmt::Display for Argument {
 }
 */
 
+const ENV_DEFAULT:i32  = 0;
+const ENV_CASE:i32  = 1;
+
 pub struct State {
     body: Part,
     arguments: Vec<Argument>,
@@ -57,6 +60,8 @@ pub struct State {
 
     output: Output,
     last_output: Vec<Output>,
+
+    current_env: Vec<i32>,
 }
 
 pub struct Part {
@@ -1228,7 +1233,16 @@ pub fn visit_single_declaration(s: &mut State, d: &syntax::SingleDeclaration) {
     }
 
     if let Some(ref initializer) = d.initializer {
+        if *s.current_env.last().unwrap() == ENV_CASE {
+            let _ = write!(s, "{}", ";\n");
+
+            if let Some(ref name) = d.name {
+                visit_identifier(s, name);
+            }
+        } else {
+        }
         let _ = write!(s, "{}", " = ");
+
         visit_initializer(s, initializer);
     }
 }
@@ -1237,7 +1251,15 @@ pub fn visit_single_declaration_no_type(s: &mut State, d: &syntax::SingleDeclara
     visit_arrayed_identifier(s, &d.ident, false);
 
     if let Some(ref initializer) = d.initializer {
+        if *s.current_env.last().unwrap() == ENV_CASE {
+            let _ = write!(s, "{}", ";\n");
+
+            let name =  &d.ident.ident;
+                visit_identifier(s, name);
+        } else {
+        }
         let _ = write!(s, "{}", " = ");
+
         visit_initializer(s, initializer);
     }
 }
@@ -1296,6 +1318,8 @@ pub fn visit_function_definition(s: &mut State, fd: &syntax::FunctionDefinition)
 }
 
 pub fn visit_compound_statement(s: &mut State, cst: &syntax::CompoundStatement) {
+    s.current_env.push(ENV_DEFAULT);
+
     let _ = write!(s, "{}", "{\n");
 
     for st in &cst.statement_list {
@@ -1303,6 +1327,7 @@ pub fn visit_compound_statement(s: &mut State, cst: &syntax::CompoundStatement) 
     }
 
     let _ = write!(s, "{}", "}\n");
+    s.current_env.pop();
 }
 
 pub fn visit_statement(s: &mut State, st: &syntax::Statement) {
@@ -1366,6 +1391,7 @@ pub fn visit_switch_statement(s: &mut State, sst: &syntax::SwitchStatement) {
 }
 
 pub fn visit_case_label(s: &mut State, cl: &syntax::CaseLabel) {
+    s.current_env.push(ENV_CASE);
     match *cl {
         syntax::CaseLabel::Case(ref e) => {
             let _ = write!(s, "{}", "case ");
@@ -1379,6 +1405,7 @@ pub fn visit_case_label(s: &mut State, cl: &syntax::CaseLabel) {
 }
 
 pub fn visit_iteration_statement(s: &mut State, ist: &syntax::IterationStatement) {
+    s.current_env.push(ENV_DEFAULT);
     match *ist {
         syntax::IterationStatement::While(ref cond, ref body) => {
             let _ = write!(s, "{}", "while (");
@@ -1600,6 +1627,7 @@ pub fn translate(file: String) -> String {
         output: Output::Body,
         last_output: Vec::new(),
         wg_size: [0, 1, 1],
+        current_env: vec!(ENV_DEFAULT),
     };
 
     visit_translation_unit(&mut state, &tu);
