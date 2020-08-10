@@ -205,6 +205,52 @@ vec4 clamp(vec4 x, float mi, float ma) {
   return make_vec4(clamp(x[0], mi, ma), clamp(x[1], mi, ma),
                    clamp(x[2], mi, ma), clamp(x[3], mi, ma));
 }
+int32_t clamp(int32_t x, int32_t mi, int32_t ma) { return min(max(x, mi), ma); }
+ivec2 clamp(ivec2 x, ivec2 mi, ivec2 ma) {
+  return make_ivec2(clamp(x[0], mi[0], ma[0]), clamp(x[1], mi[1], ma[1]));
+}
+ivec3 clamp(ivec3 x, ivec3 mi, ivec3 ma) {
+  return make_ivec3(clamp(x[0], mi[0], ma[0]), clamp(x[1], mi[1], ma[1]),
+                   clamp(x[2], mi[2], ma[2]));
+}
+ivec4 clamp(ivec4 x, ivec4 mi, ivec4 ma) {
+  return make_ivec4(clamp(x[0], mi[0], ma[0]), clamp(x[1], mi[1], ma[1]),
+                   clamp(x[2], mi[2], ma[2]), clamp(x[3], mi[3], ma[3]));
+}
+ivec2 clamp(ivec2 x, int32_t mi, int32_t ma) {
+  return make_ivec2(clamp(x[0], mi, ma), clamp(x[1], mi, ma));
+}
+ivec3 clamp(ivec3 x, int32_t mi, int32_t ma) {
+  return make_ivec3(clamp(x[0], mi, ma), clamp(x[1], mi, ma),
+                   clamp(x[2], mi, ma));
+}
+ivec4 clamp(ivec4 x, int32_t mi, int32_t ma) {
+  return make_ivec4(clamp(x[0], mi, ma), clamp(x[1], mi, ma),
+                   clamp(x[2], mi, ma), clamp(x[3], mi, ma));
+}
+uint32_t clamp(uint32_t x, uint32_t mi, uint32_t ma) { return min(max(x, mi), ma); }
+uvec2 clamp(uvec2 x, uvec2 mi, uvec2 ma) {
+  return make_uvec2(clamp(x[0], mi[0], ma[0]), clamp(x[1], mi[1], ma[1]));
+}
+uvec3 clamp(uvec3 x, uvec3 mi, uvec3 ma) {
+  return make_uvec3(clamp(x[0], mi[0], ma[0]), clamp(x[1], mi[1], ma[1]),
+                   clamp(x[2], mi[2], ma[2]));
+}
+uvec4 clamp(uvec4 x, uvec4 mi, uvec4 ma) {
+  return make_uvec4(clamp(x[0], mi[0], ma[0]), clamp(x[1], mi[1], ma[1]),
+                   clamp(x[2], mi[2], ma[2]), clamp(x[3], mi[3], ma[3]));
+}
+uvec2 clamp(uvec2 x, uint32_t mi, uint32_t ma) {
+  return make_uvec2(clamp(x[0], mi, ma), clamp(x[1], mi, ma));
+}
+uvec3 clamp(uvec3 x, uint32_t mi, uint32_t ma) {
+  return make_uvec3(clamp(x[0], mi, ma), clamp(x[1], mi, ma),
+                   clamp(x[2], mi, ma));
+}
+uvec4 clamp(uvec4 x, uint32_t mi, uint32_t ma) {
+  return make_uvec4(clamp(x[0], mi, ma), clamp(x[1], mi, ma),
+                   clamp(x[2], mi, ma), clamp(x[3], mi, ma));
+}
 
 /* bit count functions */
 
