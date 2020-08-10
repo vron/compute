@@ -180,3 +180,28 @@ vec4 mix(vec4 x, vec4 y, float a) {
   return make_vec4(x[0] * (1.0f - a) + y[0] * a, x[1] * (1.0f - a) + y[1] * a,
                    x[2] * (1.0f - a) + y[2] * a, x[3] * (1.0f - a) + y[3] * a);
 };
+
+/* clamp functions */
+float clamp(float x, float mi, float ma) { return min(max(x, mi), ma); }
+vec2 clamp(vec2 x, vec2 mi, vec2 ma) {
+  return make_vec2(clamp(x[0], mi[0], ma[0]), clamp(x[1], mi[1], ma[1]));
+}
+vec3 clamp(vec3 x, vec3 mi, vec3 ma) {
+  return make_vec3(clamp(x[0], mi[0], ma[0]), clamp(x[1], mi[1], ma[1]),
+                   clamp(x[2], mi[2], ma[2]));
+}
+vec4 clamp(vec4 x, vec4 mi, vec4 ma) {
+  return make_vec4(clamp(x[0], mi[0], ma[0]), clamp(x[1], mi[1], ma[1]),
+                   clamp(x[2], mi[2], ma[2]), clamp(x[3], mi[3], ma[3]));
+}
+vec2 clamp(vec2 x, float mi, float ma) {
+  return make_vec2(clamp(x[0], mi, ma), clamp(x[1], mi, ma));
+}
+vec3 clamp(vec3 x, float mi, float ma) {
+  return make_vec3(clamp(x[0], mi, ma), clamp(x[1], mi, ma),
+                   clamp(x[2], mi, ma));
+}
+vec4 clamp(vec4 x, float mi, float ma) {
+  return make_vec4(clamp(x[0], mi, ma), clamp(x[1], mi, ma),
+                   clamp(x[2], mi, ma), clamp(x[3], mi, ma));
+}
