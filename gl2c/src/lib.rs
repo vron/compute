@@ -815,17 +815,45 @@ pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Vec<i32> {
         syntax::Expr::Unary(ref op, ref e) => {
             visit_unary_op(s, &op);
             let _ = write!(s, "{}", "(");
-            visit_expr(s, &e);
+            let val = visit_expr(s, &e);
             let _ = write!(s, "{}", ")");
+            if val.len() <= 0 {
+                return vec!()
+            }
+            return match op {
+                syntax::UnaryOp::Inc => vec!(1+val.get(0).unwrap()),
+                syntax::UnaryOp::Dec =>  vec!(-1+val.get(0).unwrap()),
+                syntax::UnaryOp::Add =>  vec!(0+val.get(0).unwrap()),
+                syntax::UnaryOp::Minus => vec!(-val.get(0).unwrap()),
+                _ => vec!()
+            }
         }
         syntax::Expr::Binary(ref op, ref l, ref r) => {
             let _ = write!(s, "{}", "(");
-            visit_expr(s, &l);
+            let v1 = visit_expr(s, &l);
             let _ = write!(s, "{}", ")");
             visit_binary_op(s, &op);
             let _ = write!(s, "{}", "(");
-            visit_expr(s, &r);
+            let v2 = visit_expr(s, &r);
             let _ = write!(s, "{}", ")");
+            if v1.len() <= 0 || v2.len() <= 0 {
+                return vec!()
+            }
+            let v1 = v1.get(0).unwrap();
+            let v2 = v2.get(0).unwrap();
+            return match op {
+                syntax::BinaryOp::BitOr => vec!(v1 | v2),
+                syntax::BinaryOp::BitXor => vec!(v1 ^ v2),
+                syntax::BinaryOp::BitAnd => vec!(v1 & v2),
+                syntax::BinaryOp::LShift => vec!(v1 << v2),
+                syntax::BinaryOp::RShift => vec!(v1 >> v2),
+                syntax::BinaryOp::Add => vec!(v1 + v2),
+                syntax::BinaryOp::Sub => vec!(v1 - v2),
+                syntax::BinaryOp::Mult => vec!(v1 * v2),
+                syntax::BinaryOp::Div => vec!(v1 / v2),
+                syntax::BinaryOp::Mod => vec!(v1 % v2),
+                _ => vec!(),
+            }
         }
         syntax::Expr::Ternary(ref c, ref ss, ref e) => {
             visit_expr(s, &c);
