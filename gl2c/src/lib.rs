@@ -1241,10 +1241,40 @@ pub fn visit_function_parameter_declarator(s: &mut State, p: &syntax::FunctionPa
 
 pub fn visit_init_declarator_list(s: &mut State, i: &syntax::InitDeclaratorList) {
     visit_single_declaration(s, &i.head);
-
+////XXX here, a list?
+//what about arrays on second, third etc? element
+//just replace the comma below with a semicolon and type again?
     for decl in &i.tail {
-        let _ = write!(s, "{}", ", ");
-        visit_single_declaration_no_type(s, decl);
+        let _ = write!(s, "{}", "; ");
+        visit_single_declaration(s, &syntax::SingleDeclaration{
+            ty: i.head.ty.clone(),
+            name: Some(decl.ident.ident.clone()),
+            array_specifier: decl.ident.array_spec.clone(),
+            initializer: i.head.initializer.clone(),
+        });
+/*
+        pub struct SingleDeclaration {
+            pub ty: FullySpecifiedType,
+            pub name: Option<Identifier>,
+            pub array_specifier: Option<ArraySpecifier>,
+            pub initializer: Option<Initializer>,
+          }
+          
+          pub struct ArrayedIdentifier {
+            pub ident: Identifier,
+            pub array_spec: Option<ArraySpecifier>,
+          }
+
+          /// A single declaration with implicit, already-defined type.
+          #[derive(Clone, Debug, PartialEq)]
+          pub struct SingleDeclarationNoType {
+            pub ident: ArrayedIdentifier,
+            pub initializer: Option<Initializer>,
+          }
+
+*/
+
+        //visit_single_declaration_no_type(s, decl);
     }
 }
 

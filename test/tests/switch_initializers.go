@@ -18,6 +18,10 @@ void main() {
 		int b = 3;
 	case 1:
 		b = 2;
+	case 3:
+		int c1 = 4, c2 = 5;
+	case 4:
+		c1 = 33;
 	}
 }
 `
