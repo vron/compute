@@ -25,6 +25,7 @@ void main() {
 	f[3] = max(1.1, 2.2);
 	f[4] = mix(vec2(8,0), vec2(10,0), 0.5).x;
 	f[5] = clamp(5.0, 3.0, 4.0);
+	u[3] = bitCount(3);
 }
 `
 
@@ -33,7 +34,7 @@ func TestShader(t *testing.T) {
 		func() Data {
 			return Data{
 				F: []float32{1.1, 1.2, 0, 0, 0, 0},
-				U: []uint32{0, 3, 0, 0},
+				U: []uint32{0, 3, 0, 0, 0},
 			}
 		},
 		func(res Data) {
@@ -52,8 +53,11 @@ func TestShader(t *testing.T) {
 			if res.F[4] != 9 { // mix
 				t.Error("expected 9 for mix", res.F[4])
 			}
-			if res.F[5] != 4 { // mix
+			if res.F[5] != 4 { // clamp
 				t.Error("expected 4 for clamp", res.F[5])
+			}
+			if res.U[3] != 2 {
+				t.Error("expected 2 for bitcount", res.U[3])
 			}
 		})
 }

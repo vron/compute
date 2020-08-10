@@ -205,3 +205,13 @@ vec4 clamp(vec4 x, float mi, float ma) {
   return make_vec4(clamp(x[0], mi, ma), clamp(x[1], mi, ma),
                    clamp(x[2], mi, ma), clamp(x[3], mi, ma));
 }
+
+/* bit count functions */
+
+int32_t bitCount(int32_t value) {
+    return __builtin_popcount(value);
+}
+ 
+int32_t bitCount(uint32_t value) {
+    return __builtin_popcount(value);
+}
