@@ -1483,7 +1483,7 @@ pub fn visit_iteration_statement(s: &mut State, ist: &syntax::IterationStatement
             visit_statement(s, body);
             let _ = write!(s, "{}", " while (");
             visit_expr(s, cond);
-            let _ = write!(s, "{}", ")\n");
+            let _ = write!(s, "{}", ");\n");
         }
         syntax::IterationStatement::For(ref init, ref rest, ref body) => {
             let _ = write!(s, "{}", "for (");
