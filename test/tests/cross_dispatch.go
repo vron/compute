@@ -8,7 +8,7 @@ import (
 var shader = `
 #version 450
 
-layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
+layout(local_size_x = 3+1, local_size_y = 4, local_size_z = 4) in;
 
 layout(std430) buffer Out {
 	int data[];

@@ -594,11 +594,11 @@ pub fn maybe_handle_wg(state: &mut State, q: &syntax::TypeQualifier) -> Option<i
             syntax::LayoutQualifierSpec::Identifier(ref i, Some(ref e)) => {
                 let s = i.as_str();
                 if s == "local_size_x" {
-                    state.wg_size[0] = as_number(e);
+                    state.wg_size[0] = as_number(state, e);
                 } else if s == "local_size_y" {
-                    state.wg_size[1] = as_number(e);
+                    state.wg_size[1] = as_number(state, e);
                 } else if s == "local_size_z" {
-                    state.wg_size[2] = as_number(e);
+                    state.wg_size[2] = as_number(state, e);
                 } else {
                     return None; // was not a layout
                 }
@@ -724,14 +724,16 @@ pub fn maybe_handle_shared(state: &mut State, l: &syntax::InitDeclaratorList) ->
 
 }
 
-pub fn as_number(expr: &syntax::Expr) -> i32 {
+pub fn as_number(s: &mut State, expr: &syntax::Expr) -> i32 {
     // convert an expression to a number, including using constants, or
     // not
-    match expr {
-        syntax::Expr::IntConst(v) => *v,
-        syntax::Expr::UIntConst(v) => *v as i32,
-        _ => panic!("only hard coded numbers are supported for WG size (layout specifier)"),
+    s.push_output(Output::None);
+    let en = visit_expr(s, expr);
+    s.pop_output();
+    if en.len() == 0 {
+        panic!("did not manage to parse WG size constant (layout specifier)");
     }
+    *en.last().unwrap()
 }
 
 pub fn visit_layout_qualifier_spec(s: &mut State, l: &syntax::LayoutQualifierSpec) -> String {
