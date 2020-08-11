@@ -50,6 +50,7 @@ impl fmt::Display for Argument {
 
 const ENV_DEFAULT:i32  = 0;
 const ENV_CASE:i32  = 1;
+const ENV_FOR:i32  = 2;
 
 pub struct State {
     body: Part,
@@ -1299,7 +1300,7 @@ pub fn visit_single_declaration(s: &mut State, d: &syntax::SingleDeclaration) {
     }
 
     if let Some(ref initializer) = d.initializer {
-        if *s.current_env.last().unwrap() == ENV_CASE {
+        if *s.current_env.last().unwrap() != ENV_FOR {
             let _ = write!(s, "{}", ";\n");
 
             if let Some(ref name) = d.name {
@@ -1317,7 +1318,7 @@ pub fn visit_single_declaration_no_type(s: &mut State, d: &syntax::SingleDeclara
     visit_arrayed_identifier(s, &d.ident, false);
 
     if let Some(ref initializer) = d.initializer {
-        if *s.current_env.last().unwrap() == ENV_CASE {
+        if *s.current_env.last().unwrap() != ENV_FOR {
             let _ = write!(s, "{}", ";\n");
 
             let name =  &d.ident.ident;
@@ -1488,8 +1489,10 @@ pub fn visit_iteration_statement(s: &mut State, ist: &syntax::IterationStatement
         }
         syntax::IterationStatement::For(ref init, ref rest, ref body) => {
             let _ = write!(s, "{}", "for (");
+            s.current_env.push(ENV_FOR);
             visit_for_init_statement(s, init);
             visit_for_rest_statement(s, rest);
+            s.current_env.pop();
             let _ = write!(s, "{}", ") ");
             visit_statement(s, body);
         }

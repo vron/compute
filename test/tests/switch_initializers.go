@@ -20,6 +20,8 @@ void main() {
 		b = 2;
 	case 3:
 		int c1 = 4, c2 = 5;
+		for(int i = 0; i < 10; i++);
+		int bb = 2;
 	case 4:
 		c1 = 33;
 	}
