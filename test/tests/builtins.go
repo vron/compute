@@ -34,6 +34,7 @@ void main() {
 	i[1] = findLSB(1);
 	i[2] = findLSB(2);
 	f[6] = round(vec3(1.3, 1.4, 1.2)).x;
+	f[7] = sign(vec2(0, 1)).y;
 }
 `
 
@@ -79,6 +80,9 @@ func TestShader(t *testing.T) {
 			}
 			if res.F[6] != 1 {
 				t.Error("expected 1 for round", res.F[6])
+			}
+			if res.F[7] != 1 {
+				t.Error("expected 1 for sign", res.F[67])
 			}
 		})
 }
