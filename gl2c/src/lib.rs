@@ -901,6 +901,11 @@ pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Vec<i32> {
                         "mat3" => write!(s, "{}", "make_mat3"),
                         "mat4" => write!(s, "{}", "make_mat4"),
                         "barrier" => write!(s, "{}", "this->barrier"),
+                        "bool" => write!(s, "{}", "Bool"),
+                        "int" => write!(s, "{}", "int32_t"),
+                        "uint" => write!(s, "{}", "uint32_t"),
+                        "float" => write!(s, "{}", "float"),
+                        "double" => write!(s, "{}", "double"),
                         _ =>  write!(s, "{}", n.0),
                     };
                 },
