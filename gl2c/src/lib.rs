@@ -643,6 +643,7 @@ pub fn maybe_handle_global_buffer(state: &mut State, l: &syntax::InitDeclaratorL
                     match sq {
                         syntax::StorageQualifier::Uniform => (),
                         syntax::StorageQualifier::Buffer => (),
+                        syntax::StorageQualifier::WriteOnly => (),
                         _ => return None // not a global input / output
                     }
                 },

@@ -315,6 +315,15 @@ func cBool(b bool) int32 {
 	return 0
 }
 
+func writeByte(b []byte, by byte) {
+	b[0] = by
+}
+
+func readByte(b []byte) byte {
+	return b[0]
+}
+
+
 func iBool(v uint32) bool {
 	return !(v==0)
 }
@@ -359,6 +368,8 @@ func writeSingle(buf io.Writer, parentPos string, ty *types.GlslType, head strin
 		fmt.Fprintf(buf, "\tbo.PutUint32(%v, uint32(%v))\n", parentPos, head)
 	case "uint32_t":
 		fmt.Fprintf(buf, "\tbo.PutUint32(%v, %v)\n", parentPos, head)
+	case "uint8_t":
+		fmt.Fprintf(buf, "\twriteByte(%v, %v)\n", parentPos, head)
 	default:
 		fmt.Fprintf(buf, "\t(%v).Encode(%v) \n", head, parentPos)
 	}
@@ -446,6 +457,8 @@ func readSingle(buf io.Writer, parentPos string, ty *types.GlslType, head string
 		fmt.Fprintf(buf, "\t%v = int32(bo.Uint32(%v))\n", head, parentPos)
 	case "uint32_t":
 		fmt.Fprintf(buf, "\t%v = bo.Uint32(%v)\n", head, parentPos)
+	case "uint8_t":
+		fmt.Fprintf(buf, "\t%v = readByte(%v)\n", head, parentPos)
 	default:
 		fmt.Fprintf(buf, "\t(%v).Decode(%v) \n", head, parentPos)
 	}

@@ -59,6 +59,7 @@ func (tt *Types) ListAllTypes() (ts []*GlslType) {
 }
 
 func (ts *Types) createBasicBuiltinTypes() {
+	ts.put(GlslType{Builtin: true, Name: "uint8_t", C: &CType{Basic: CBasicType{Name: "uint8_t"}, Size: align(1, 1)}})
 	ts.put(GlslType{Builtin: true, Name: "Bool", C: &CType{Basic: CBasicType{Name: "int32_t"}, Size: align(4, 4)}})
 	ts.put(GlslType{Builtin: true, Name: "int32_t", C: &CType{Basic: CBasicType{Name: "int32_t"}, Size: align(4, 4)}})
 	ts.put(GlslType{Builtin: true, Name: "uint32_t", C: &CType{Basic: CBasicType{Name: "uint32_t"}, Size: align(4, 4)}})
@@ -102,6 +103,11 @@ func (ts *Types) createComplexBuiltinTypes() {
 	ts.put(GlslType{Builtin: true, Name: "image2Drgba32f", C: &CType{Struct: CStruct{
 		Fields: []CField{
 			{Name: "data", CType: CreateArray(ts.Get("float").C, []int{-1}), ByteOffset: 0},
+			{Name: "width", CType: ts.Get("int32_t").C, ByteOffset: 28},
+		}}, Size: align(32, 8)}})
+	ts.put(GlslType{Builtin: true, Name: "image2Drgba8", C: &CType{Struct: CStruct{
+		Fields: []CField{
+			{Name: "data", CType: CreateArray(ts.Get("uint8_t").C, []int{-1}), ByteOffset: 0},
 			{Name: "width", CType: ts.Get("int32_t").C, ByteOffset: 28},
 		}}, Size: align(32, 8)}})
 }

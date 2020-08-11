@@ -17,6 +17,9 @@ func (t GlslType) GoName() string {
 	if t.Name == "Bool" {
 		return "Bool"
 	}
+	if t.Name == "uint8_t" {
+		return "byte"
+	}
 	if t.Name == "uint32_t" {
 		return "uint32"
 	}
