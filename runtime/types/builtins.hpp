@@ -135,6 +135,9 @@ ivec4 max(ivec4 x, int32_t y) {
                     std::max(x[3], y));
 };
 uint32_t max(uint32_t x, uint32_t y) { return std::max(x, y); }
+uint32_t max(uint32_t x, int32_t y) { 
+    // is this correct with overflow?
+    return std::max(x, (uint32_t)y); }
 uvec2 max(uvec2 x, uvec2 y) {
   return make_uvec2(std::max(x[0], y[0]), std::max(x[1], y[1]));
 };
@@ -336,4 +339,18 @@ ivec2 sign(ivec2 x) { return make_ivec2(sign(x[0]), sign(x[1])); }
 ivec3 sign(ivec3 x) { return make_ivec3(sign(x[0]), sign(x[1]), sign(x[2])); }
 ivec4 sign(ivec4 x) {
   return make_ivec4(sign(x[0]), sign(x[1]), sign(x[2]), sign(x[3]));
+}
+
+
+float always_inline inversesqrt(float x) {
+    return 1.0f/sqrtf(x); // there ase instructions, but they are platofrm specific...
+}
+vec2 always_inline inversesqrt(vec2 x) {
+    return make_vec2(inversesqrt(x[0]), inversesqrt(x[1])); // there ase instructions, but they are platofrm specific...
+}
+vec3 always_inline inversesqrt(vec3 x) {
+    return make_vec3(inversesqrt(x[0]), inversesqrt(x[1]), inversesqrt(x[2])); // there ase instructions, but they are platofrm specific...
+}
+vec4 always_inline inversesqrt(vec4 x) {
+    return make_vec4(inversesqrt(x[0]), inversesqrt(x[1]), inversesqrt(x[2]), inversesqrt(x[3])); // there ase instructions, but they are platofrm specific...
 }
