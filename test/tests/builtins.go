@@ -33,6 +33,7 @@ void main() {
 	i[0] = findLSB(0);
 	i[1] = findLSB(1);
 	i[2] = findLSB(2);
+	f[6] = round(vec3(1.3, 1.4, 1.2)).x;
 }
 `
 
@@ -40,7 +41,7 @@ func TestShader(t *testing.T) {
 	ensureRun(t, 1, 1, 1, 1,
 		func() Data {
 			return Data{
-				F: []float32{1.1, 1.2, 0, 0, 0, 0},
+				F: []float32{1.1, 1.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 				U: []uint32{0, 3, 0, 0, 0},
 				I: []int32{0, 0, 0},
 			}
@@ -75,6 +76,9 @@ func TestShader(t *testing.T) {
 			}
 			if res.I[2] != 1 {
 				t.Error("expected 1 for bitcount", res.I[2])
+			}
+			if res.F[6] != 1 {
+				t.Error("expected 1 for round", res.F[6])
 			}
 		})
 }

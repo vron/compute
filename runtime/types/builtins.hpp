@@ -26,6 +26,9 @@ int32_t findLSB(uint32_t value) {
     return __builtin_ffs(value)-1;
 }
 
+
+
+
 /* min-max functions */
 float min(float x, float y) { return std::min(x, y); }
 vec2 min(vec2 x, vec2 y) {
@@ -268,4 +271,54 @@ int32_t bitCount(int32_t value) {
  
 int32_t bitCount(uint32_t value) {
     return __builtin_popcount(value);
+}
+
+
+/* pac and unpac functions */
+vec2 unpackUnorm2x16(uint32_t p) {
+    float v1 = (float)(p & 0xFFFF);
+    float v2 = (float)(p & 0xFFFF0000);
+    return make_vec2(v1/65535.0f, v2/65535.0f);
+}
+ 
+vec2 unpackSnorm2x16(uint32_t p) {
+    float v1 = (float)(p & 0xFFFF);
+    float v2 = (float)(p & 0xFFFF0000);
+    return make_vec2(clamp(v1 / 32727.0f, -1.0, 1.0), clamp(v2 / 32727.0f, -1.0, 1.0));
+}
+ 
+vec4 unpackUnorm4x8(uint32_t p) {
+    float v1 = (float)(p & 0xFF);
+    float v2 = (float)(p & 0xFF00);
+    float v3 = (float)(p & 0xFF0000);
+    float v4 = (float)(p & 0xFF000000);
+    return make_vec4(v1/255.0f, v2/255.0f, v3/255.0f, v4/255.0f);
+}
+ 
+vec4 unpackSnorm4x8(uint32_t p) {
+    float v1 = (float)(p & 0xFF);
+    float v2 = (float)(p & 0xFF00);
+    float v3 = (float)(p & 0xFF0000);
+    float v4 = (float)(p & 0xFF000000);
+    return make_vec4(clamp(v1 / 127.0f, -1.0, 1.0),
+                    clamp(v2 / 127.0f, -1.0, 1.0),
+                    clamp(v3 / 127.0f, -1.0, 1.0),
+                    clamp(v4 / 127.0f, -1.0, 1.0));
+}
+
+/* round functions */
+
+//float round(float x) {
+//    return roundf(x);
+//}
+vec2 round(vec2 x) {
+    return make_vec2(roundf(x[0]), roundf(x[1]));
+}
+
+vec3 round(vec3 x) {
+    return make_vec3(roundf(x[0]), roundf(x[1]), roundf(x[2]));
+}
+
+vec4 round(vec4 x) {
+    return make_vec4(roundf(x[0]), roundf(x[1]), roundf(x[2]), roundf(x[3]));
 }
