@@ -18,6 +18,14 @@ float uintBitsToFloat(uint32_t u) {
   return f;
 }
 
+int32_t findLSB(int32_t value){
+    return __builtin_ffs(value)-1;
+}
+ 
+int32_t findLSB(uint32_t value) {
+    return __builtin_ffs(value)-1;
+}
+
 /* min-max functions */
 float min(float x, float y) { return std::min(x, y); }
 vec2 min(vec2 x, vec2 y) {

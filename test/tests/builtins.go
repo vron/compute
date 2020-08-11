@@ -18,6 +18,10 @@ layout(std430) buffer Out2 {
 	float[] f;
 };
 
+layout(std430) buffer Out3 {
+	int[] i;
+};
+
 void main() {
 	u[0] = floatBitsToUint(f[0]);
 	f[1] = uintBitsToFloat(u[1]);
@@ -26,6 +30,9 @@ void main() {
 	f[4] = mix(vec2(8,0), vec2(10,0), 0.5).x;
 	f[5] = clamp(5.0, 3.0, 4.0);
 	u[3] = bitCount(3);
+	i[0] = findLSB(0);
+	i[1] = findLSB(1);
+	i[2] = findLSB(2);
 }
 `
 
@@ -35,6 +42,7 @@ func TestShader(t *testing.T) {
 			return Data{
 				F: []float32{1.1, 1.2, 0, 0, 0, 0},
 				U: []uint32{0, 3, 0, 0, 0},
+				I: []int32{0, 0, 0},
 			}
 		},
 		func(res Data) {
@@ -58,6 +66,15 @@ func TestShader(t *testing.T) {
 			}
 			if res.U[3] != 2 {
 				t.Error("expected 2 for bitcount", res.U[3])
+			}
+			if res.I[0] != -1 {
+				t.Error("expected -1 for bitcount", res.I[0])
+			}
+			if res.I[1] != 0 {
+				t.Error("expected 0 for bitcount", res.I[1])
+			}
+			if res.I[2] != 1 {
+				t.Error("expected 1 for bitcount", res.I[2])
 			}
 		})
 }
