@@ -25,7 +25,7 @@ Unless you get errors (try with a simple shader first) you should have both the 
 the go library wrapper generated in the current directory.
 
 For an example of using compute to generate a package, including how to call it
-please see github.com/vron/computeexample
+please see **github.com/vron/computeexample**
 
 # Supported platforms
 Currently supported on Linux, windows, osX amd64. Intended to support arm32 and arm64 as well.

@@ -13,7 +13,7 @@ jobs:
 
       - name: Install requirements (Macos)
         run: |
-          brew install glslang
+          brew install glslang lua
         if: runner.os == 'MacOS'
 
       - name: Install glslang-tools (WINDOWS)
@@ -26,13 +26,15 @@ jobs:
         if: runner.os == 'Windows'
 
       - name: Install required packages (LINUX)
-        run : sudo apt-get update && sudo apt-get install build-essential glslang-tools clang cargo rustc git
+        run : sudo apt-get update && sudo apt-get install build-essential glslang-tools clang cargo rustc git lua5.3
         if: runner.os == 'Linux'
 
       - name: Install required packages (WINDOWS)
         run: |
-          choco install -y llvm
+          choco install -y llvm lua
           echo "::add-path::C:/Program Files/LLVM/bin"
+          echo "::add-path::C:/Program Files (x86)/Lua/5.1/"
+          refreshenv
         if: runner.os == 'Windows'
 
       - name: Install goimports
