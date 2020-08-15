@@ -2,59 +2,48 @@
 
 ![Test](https://github.com/vron/compute/workflows/Test/badge.svg)
 
-This project compiles (a subset of) Vulkan/OpenGL compute shaders to a C library
+This project compiles GLSL 4.5/4.6 compute shaders to a C library
 with low dependencies that can be called from any language allowing C bindings.
 Additionally such a Go package is generated, providing a clean interface while using
 cgo and the C library underneath.
 
-Not all built-in functions in GLSL are yet implemented, and although there is some
-test coverage far from everything (in particular related to synchronization primitives)
-is as of yet tested. Bug reports with minimal examples are appreciated, but please note
+Not all built-in functions in GLSL are yet implemented, this is a wip and bugs
+are to be expected. Bug reports are appreciated, but please note
 that the project main use case is for use in gioui and features not needed may not be
 prioritized.
 
 # Get started
-Due to the complicated dependencies the tool is easiest to use through docker. If you
-want to run and use it locally please refer to the source code. Note that Windows and macOS
-are supported, but not through the docker file.
+For linux through docker:
 
-To simply use this project to generate a go package from a compute shader such that you
-can import and use it directly, the easiest is to run it through docker (only supported
-on Linux for now, see TODO below, also the image is huge - could probably be slimmed down
-a bit, but ut must include llvm, rust, go etc. etc.):
-
-1. Cd into the directory with your shader file (*.comp file)
+1. Cd into the directory with your shader file(s) (*.comp)
 
 2. Run:
 
     docker run -v $(pwd):/data vron/compute your_shader.comp
 
 Unless you get errors (try with a simple shader first) you should have both the C and
-the go library wrapper generated.
+the go library wrapper generated in the current directory.
 
 For an example of using compute to generate a package, including how to call it
 please see github.com/vron/computeexample
 
-# Known limitations
- - Currently only works on x64
- - Several built in glsl functions missing
- - Atomics do not function on vector components - use an array for this
+# Supported platforms
+Currently supported on Linux, windows, osX amd64. Intended to support arm32 and arm64 as well.
 
-# Development get-started
-There has not been time to write a detailed explanation, but the best starting point to understand
-what is going on is to start from the top level command:
 
-    go run tests/main.go
+# How to run locally
+In order to run the project locally (not through docker) you will need a set of dependences,
+in particular: recent clang, go, rust, lua, glslangValidator. For details please refer to the
+Dockerfile to ensure you have all that is needed.
 
-which runs all the tests and follow what it does (see also scripts/build.go).
+1. Cd into the top level directory of this project
 
-# TODO
- - Only support little endian for now - if we want to handle big remember how to handle Bool type in go with direct casting!
- - Cross compile for all platforms from the Docker image.
- - Implement support for ARM64, Android, Linux
- - Add test cases for name collisions and fix the naming...
- - Add pathological test cases such as wg size 0 etc. etc.
- - Check if we have any problems with false sharing
- - When running the tests, first pre-build the headers to save time on each?
- - Variable sized stacs to avoid that as configuration? https://llvm.org/docs/SegmentedStacks.html
- - Ref vec3's and https://stackoverflow.com/questions/23628259/how-to-properly-pad-and-align-data-in-opengl-for-std430-layout -  can we fully match the std430 so we are byte compatible? that would be good...
+2. Run (to run all tests and ensure everything works):
+
+    go run test/main.go
+
+3. Run (to build your shader):
+
+    go run script/build.go path_to_your_shader.comp
+
+4. Find your generated lib in ./build/go/*

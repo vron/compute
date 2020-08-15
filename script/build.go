@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -106,7 +105,6 @@ func main() {
 	for i := range files {
 		files[i] = filepath.Base(files[i])
 	}
-	fmt.Println(files)
 	ensure(runf("build/go", "go", append([]string{"test", "-v"}, files...)...))
 }
 
