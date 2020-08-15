@@ -33,17 +33,16 @@ void main() {
 `
 
 func TestShader(t *testing.T) {
-	// create the input data
-	data := make([]int, 4)
-	d := Data{
-		Values: intToByte(data),
-	}
+	ensureRun(t, -1, 1, 1, 1, func() Data {
+		return Data{
+			Values: []int32{0},
+		}
+	}, func(res Data) {
+		if res.Values[0] != 3 {
+			t.Error("data not as expected: ", res.Values)
+		}
+	})
 
-	ensureRun(t, -1, d, 1, 1, 1)
-
-	if data[0] != 3 {
-		t.Error("data not as expected: ", data)
-	}
 }
 
 func intToByte(raw []int) []byte {

@@ -6,9 +6,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"text/tabwriter"
+
+	"github.com/vron/compute/glbind/input"
+	"github.com/vron/compute/glbind/types"
 )
 
-func generateSharedH(inp Input) {
+func generateShared(inp input.Input, ts *types.Types) {
 	f, err := os.Create(filepath.Join(fOut, "generated/shared.h"))
 
 	if err != nil {
@@ -34,8 +39,9 @@ func generateSharedH(inp Input) {
 #define exported_func
 #endif
 
-#include "errno.h"
-#include "stdint.h"
+#include <errno.h>
+#include <stdint.h>
+#include <stdalign.h>
 
 /*
   cpt_error_t represents an error as reported from cpt_dispatch_kernel. The 
@@ -54,13 +60,45 @@ struct cpt_error_t {
 
 `)
 
-	// Write all complex types
-	for _, st := range types.ExportedStructTypes() {
-		fmt.Fprintf(buf, "typedef struct {\n")
-		for _, f := range st.CType().Fields {
-			buf.WriteString("  " + f.String() + ";\n")
+	// Write all exported types complete with alignment info for user reference.
+	// TODO: Add padding to all these such that they actually get what we expect
+	for _, st := range ts.ListExportedTypes() {
+		if st.C.IsStruct() {
+			w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
+			fmt.Fprintf(buf, "typedef struct {  // size = %v, align = %v\n", st.C.Size.ByteSize, st.C.Size.ByteAlignment)
+			offset := 0
+			for i, f := range st.C.Struct.Fields {
+				if offset != f.ByteOffset {
+					fmt.Fprintf(w, "  char\t _pad%v[%v];\t\t\t\n", i, f.ByteOffset-offset)
+				}
+				offset = f.ByteOffset
+				fmt.Fprintf(w, "  "+alignas(i, st.C.Size.ByteAlignment)+f.CType.CString("cpt_", f.Name, true)+";\t// offset =\t%v\t\n", f.ByteOffset)
+				if f.CType.IsArray() && f.CType.Array.Len == -1 {
+					// should be a pointer: TODO: 32bit
+					offset += 8
+				} else {
+					offset += f.CType.Size.ByteSize
+				}
+			}
+			if offset != st.C.Size.ByteSize {
+				fmt.Fprintf(w, "  char\t _pad[%v];\t\t\t\n", st.C.Size.ByteSize-offset)
+			}
+			w.Flush()
+			fmt.Fprintf(buf, "} %v;\n\n", st.CName("cpt_"))
+		} else if st.C.IsVector() {
+			w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
+			fmt.Fprintf(w, "typedef struct {  // size = %v, align = %v\n", st.C.Size.ByteSize, st.C.Size.ByteAlignment)
+			offset := 0
+			for i := 0; i < st.C.Vector.Len; i++ {
+				fmt.Fprintf(w, "  %v%v\t%v;\t// offset =\t%v\t\n", alignas(i, st.C.Size.ByteAlignment), st.C.Vector.Basic.CString("", "", true), comp(i), st.C.Vector.Basic.Size.ByteSize*i)
+				offset += st.C.Vector.Basic.Size.ByteSize
+			}
+			if offset != st.C.Size.ByteSize {
+				fmt.Fprintf(w, "  char\t _pad[%v];\t\t\t\n", st.C.Size.ByteSize-offset)
+			}
+			w.Flush()
+			fmt.Fprintf(buf, "} %v;\n\n", st.CName("cpt_"))
 		}
-		fmt.Fprintf(buf, "} %v;\n\n", st.CType().Name)
 	}
 
 	// write the actually data we should export
@@ -72,11 +110,21 @@ struct cpt_error_t {
 */
 `)
 	buf.WriteString("typedef struct {\n")
+	w := tabwriter.NewWriter(buf, 0, 1, 1, ' ', 0)
 	for _, arg := range inp.Arguments {
-		ty := maybeCreateArrayType(arg.Ty, arg.Arrno)
-		cf := CField{Name: arg.Name, Ty: ty}
-		buf.WriteString("  " + cf.String() + ";\n")
+		ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
+		if ty.IsComplexStruct() {
+			fmt.Fprintf(w, "  "+ty.CString("cpt_", arg.Name, true)+";\n")
+		} else {
+			name := arg.Name
+			if !(ty.IsArray() && ty.Array.Len == -1) {
+				name = "(*" + name + ")"
+			}
+			fmt.Fprintf(w, "  "+ty.CString("cpt_", name, true)+";\n")
+			fmt.Fprintf(w, "  int64_t "+arg.Name+"_len;\n\n")
+		}
 	}
+	w.Flush()
 	buf.WriteString(`} cpt_data;
 
 /*
@@ -85,9 +133,11 @@ struct cpt_error_t {
   If there is insufficient memory available to create a new kernel 0 is
   returned. For all other possible errors a kernel reference is returned and
   the next call to cpt_dispatch_kernel will return the error information.
-  cpt_new_kernel is safe for concurrent use from multiple threads.
+  cpt_new_kernel is safe for concurrent use from multiple threads. The stack size
+  that each shader invocation should have access to can be specified in the last
+  argument. If negative a default value of 16kB will be used.
 */
-exported_func void *cpt_new_kernel(int32_t num_t);
+exported_func void *cpt_new_kernel(int32_t num_t, int32_t stack_size);
 
 /*
   cpt_dispatch_kernel issues a calculation of the compute shader using x, y, z
@@ -111,4 +161,26 @@ exported_func struct cpt_error_t cpt_dispatch_kernel(void *k, cpt_data d, int32_
 */
 exported_func void cpt_free_kernel(void *k);
 `)
+}
+
+func alignas(i, v int) string {
+	if i == 0 {
+		return fmt.Sprintf("alignas(%v) ", v)
+	}
+	return ""
+}
+
+func comp(i int) string {
+	switch i {
+	case 0:
+		return "x"
+	case 1:
+		return "y"
+	case 2:
+		return "z"
+	case 3:
+		return "w"
+	default:
+		return "{" // this will for sure generate cmpilation errors...
+	}
 }

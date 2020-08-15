@@ -1,13 +1,11 @@
 .text
 
-
 .globl amd64_win_switch
 .intel_syntax noprefix
 /*
-    // https://en.wikipedia.org/wiki/X86_calling_conventions#x86-64_calling_conventions
-    // https://docs.microsoft.com/en-us/cpp/build/x64-calling-convention?view=vs-2019
-    // https://docs.microsoft.com/en-us/cpp/build/stack-usage?view=vs-2019
-
+    https://en.wikipedia.org/wiki/X86_calling_conventions#x86-64_calling_conventions
+    https://docs.microsoft.com/en-us/cpp/build/x64-calling-convention?view=vs-2019
+    https://docs.microsoft.com/en-us/cpp/build/stack-usage?view=vs-2019
 */
 amd64_win_switch:
     /* Store the current context */
@@ -16,17 +14,17 @@ amd64_win_switch:
     mov   QWORD PTR [rdx+0x10],      rdi  
     mov   QWORD PTR [rdx+0x18],      rsi
 
-    mov   r10,           QWORD PTR [rsp]              // return pos at top of stack
-    mov   QWORD PTR [rdx+0x48],      r10              // return pos at top of stack
-    lea   r10,                 [rsp+0x8]              // stack without return
-    mov   QWORD PTR [rdx+0x20],      r10              // stack without return
+    mov   r10,           QWORD PTR [rsp]    // return pos at top of stack
+    mov   QWORD PTR [rdx+0x48],      r10    // return pos at top of stack
+    lea   r10,                 [rsp+0x8]    // stack without return
+    mov   QWORD PTR [rdx+0x20],      r10    // stack without return
 
     mov   QWORD PTR [rdx+0x28],      r12  
     mov   QWORD PTR [rdx+0x30],      r13 
     mov   QWORD PTR [rdx+0x38],      r14  
     mov   QWORD PTR [rdx+0x40],      r15
 
-    movaps XMMWORD PTR [rdx+0x50],  xmm6              // calling con. also uses sse regs
+    movaps XMMWORD PTR [rdx+0x50],  xmm6    // calling con. also uses sse regs
     movaps XMMWORD PTR [rdx+0x60],  xmm7
     movaps XMMWORD PTR [rdx+0x70],  xmm8
     movaps XMMWORD PTR [rdx+0x80],  xmm9

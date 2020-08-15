@@ -1,9 +1,7 @@
 package kernel
 
 import (
-	"reflect"
 	"testing"
-	"unsafe"
 )
 
 // TODO: Also add a test case with vectors and matrices as part of a slice - to chec that we are picing up
@@ -45,26 +43,18 @@ void main() {
 `
 
 func TestShader(t *testing.T) {
-	data := make([]float32, 100)
-	// first columns of 1, 2nd of 2 etc.
-	d := Data{
-		Results: floatToByte(data),
-		M2:      [4]float32{1, 1, 2, 2},
-		M3:      [9]float32{1, 1, 1, 2, 2, 2, 3, 3, 3},
-		M4:      [16]float32{1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4},
-	}
-	ensureRun(t, 1, d, 1, 1, 1)
-	for i := range data {
-		if data[i] != 0 {
-			t.Error(i, "data not 0:", data[i])
+	ensureRun(t, 1, 1, 1, 1, func() Data {
+		return Data{
+			Results: make([]float32, 100),
+			M2:      &Mat2{Vec2{1, 1}, Vec2{2, 2}},
+			M3:      &Mat3{Vec3{1, 1, 1}, Vec3{2, 2, 2}, Vec3{3, 3, 3}},
+			M4:      &Mat4{Vec4{1, 1, 1, 1}, Vec4{2, 2, 2, 2}, Vec4{3, 3, 3, 3}, Vec4{4, 4, 4, 4}},
 		}
-	}
-}
-
-func floatToByte(raw []float32) []byte {
-	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
-	header.Len *= 4
-	header.Cap *= 4
-	data := *(*[]byte)(unsafe.Pointer(&header))
-	return data
+	}, func(res Data) {
+		for i := range res.Results {
+			if res.Results[i] != 0 {
+				t.Error(i, "data not 0:", res.Results[i])
+			}
+		}
+	})
 }

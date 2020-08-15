@@ -24,9 +24,9 @@ dependencies = [
 
 [[package]]
 name = "glsl"
-version = "4.1.0"
+version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "071526197a77847da22fc6c911a9076dcf7fab04ffed82f399a0321ddfba2b7a"
+checksum = "fbb60883f27246a5a073afb60be8bfe558a399b1dd7ef0d035b9c4b544a685da"
 dependencies = [
  "nom",
 ]

@@ -14,3 +14,5 @@ typedef int32_t Bool;
 #include "image.hpp"
 
 #include "atomic.hpp"
+
+#include "builtins.hpp"

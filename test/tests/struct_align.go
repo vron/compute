@@ -39,26 +39,22 @@ void main() {
 `
 
 func TestShader(t *testing.T) {
-	p := [3]float32{11, 22, 33} // sum = 66
-	d := Data{
-		Index: 43,
-		Flag:  true,
-		Pos:   p,
-		Array: make([]byte, 100*Element{}.Stride()),
-	}
-
-	ensureRun(t, 1, d, 1, 1, 1)
-
-	// Decode the given element and verify
-	el := &Element{}
-	el.Decode(d.Array[el.Stride()*43:])
-	if el.Val != 66+43 {
-		for i := 0; i < 100; i++ {
-			el := &Element{}
-			el.Decode(d.Array[el.Stride()*i:])
-			t.Log(el)
+	ensureRun(t, -1, 1, 1, 1, func() Data {
+		i := int32(43)
+		b := True
+		return Data{
+			Index: &i,
+			Flag:  &b,
+			Pos:   &Vec3{11, 22, 33}, // sum = 66,
+			Array: make([]Element, 100),
 		}
-		t.Log(d.Array[el.Stride()*43:])
-		t.Error("output not as expected", el)
-	}
+	}, func(res Data) {
+		if res.Array[43].Val != 66+43 {
+			for i := 0; i < 100; i++ {
+				t.Log(res.Array[i])
+			}
+			t.Log(res.Array[43].Val)
+			t.Error("output not as expected")
+		}
+	})
 }

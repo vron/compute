@@ -34,6 +34,14 @@ func main() {
 
 	ensure(os.MkdirAll("build/generated", 0777))
 
+	// first use lcpp to concatenate all into one file by processing the
+	// includes such that we have single file we can build.
+	ts := filepath.Base(SHADER)
+	path := filepath.Dir(SHADER)
+	ts = filepath.Join("build", ts+".inc.comp")
+	ensure(run("lua", "script/lcpp.lua", SHADER, "-I"+path, "-o", ts))
+	SHADER = ts
+
 	ensure(run("glslangValidator", SHADER))
 
 	ensure(runf("gl2c", "cargo", "run", "-q", "--", "../"+SHADER, "../build/kernel.json"))
@@ -42,6 +50,7 @@ func main() {
 	ensure(run("go", append([]string{"run"}, files...)...))
 
 	ensure(run("goimports", "-w", "build/kernel.go"))
+	ensure(run("goimports", "-w", "build/types.go"))
 
 	// TODO: here we want to build for multiple platforms...
 	cargs := []string{
@@ -52,6 +61,10 @@ func main() {
 		"-Wextra",
 		"-Werror",
 		"-Wno-unused-function",
+		"-Wuninitialized",
+		"-pedantic-errors",
+		"-Wmost",
+		"-Wno-extra-semi",
 
 		"-Ofast",
 		"-ffast-math",
@@ -60,10 +73,10 @@ func main() {
 	asm := ""
 	outf := ""
 	if runtime.GOOS == "windows" {
-		asm = "routines/arch/amd64_win.S"
+		asm = "co/arch/amd64_win.S"
 		outf = "shader.dll"
 	} else {
-		asm = "routines/arch/amd64_nix.S"
+		asm = "co/arch/amd64_nix.S"
 		outf = "./shader.so"
 		cargs = append(cargs, "-fPIC")
 	}
@@ -78,6 +91,7 @@ func main() {
 		cp("build/util_test.go", "build/go/util_test.go")
 	}
 	cp("build/kernel.go", "build/go/kernel.go")
+	cp("build/types.go", "build/go/types.go")
 
 	if runtime.GOOS == "windows" {
 		cp("build/shader.dll", "build/go/shader.dll")
@@ -86,7 +100,12 @@ func main() {
 		cp("build/shader.so", "build/go/build/shader.so")
 	}
 	cp("build/generated/shared.h", "build/go/shared.h")
-	ensure(runf("build/go", "go", "test", "-v", "."))
+
+	files, _ = filepath.Glob("build/go/*.go")
+	for i := range files {
+		files[i] = filepath.Base(files[i])
+	}
+	ensure(runf("build/go", "go", append([]string{"test", "-v"}, files...)...))
 }
 
 func run(m string, args ...string) error {

@@ -5,10 +5,8 @@ package kernel
 	launching wg's, syning etc.
 */
 import (
-	"reflect"
 	"runtime"
 	"testing"
-	"unsafe"
 )
 
 var shader = `
@@ -21,7 +19,7 @@ layout(std430) buffer Out {
 };
 
 void main() {
-	uint index = gl_LocalInvocationIndex;
+	uint index = gl_LocalInvocationIndex + 4*4*4*(gl_WorkGroupID .x + gl_WorkGroupID .y*8 + gl_WorkGroupID .z*8*8);
 	int value = int(index);
 
 	if (index % 2 == 0) {
@@ -30,7 +28,7 @@ void main() {
 
 	barrier();
 
-	if (index < 1024) {
+	if (index < 1024*1024) {
 		value = 1;
 	}
 	for (int i = 0; i < 4; i++) {
@@ -48,9 +46,9 @@ void main() {
 `
 
 func BenchmarkScheduling(b *testing.B) {
-	data := make([]int32, 64)
-	d := Data{Data: intToByte(data)}
-	k, err := New(runtime.GOMAXPROCS(-1))
+	data := make([]int32, 64*8*8*8*1024)
+	d := Data{Data: data}
+	k, err := New(runtime.GOMAXPROCS(-1), 1024*1024)
 	if err != nil {
 		b.Error(err)
 		b.FailNow()
@@ -66,7 +64,7 @@ func BenchmarkScheduling(b *testing.B) {
 	}
 	b.StopTimer()
 
-	for i := range data {
+	for i := range data[:64] {
 		ex := int32(1)
 		if i%2 == 0 {
 			ex = 5
@@ -75,12 +73,4 @@ func BenchmarkScheduling(b *testing.B) {
 			b.Error(i, "expected value: ", ex, "got", data[i])
 		}
 	}
-}
-
-func intToByte(raw []int32) []byte {
-	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
-	header.Len *= 4
-	header.Cap *= 4
-	data := *(*[]byte)(unsafe.Pointer(&header))
-	return data
 }

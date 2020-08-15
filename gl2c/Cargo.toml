@@ -6,7 +6,7 @@ authors = ["V Ogeman and glsl authors"]
 edition = "2018"
 
 [dependencies]
-glsl = "4.0"
+glsl = "5.0.1"
 serde = "0.9"
 serde_json = "0.9"
 serde_derive = "0.9"

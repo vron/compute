@@ -1,9 +1,7 @@
 package kernel
 
 import (
-	"reflect"
 	"testing"
-	"unsafe"
 )
 
 var shader = `
@@ -25,28 +23,19 @@ void main() {
 func TestShader(t *testing.T) {
 	// create the input data
 	nop := 2
-	imgg := make([]byte, nop*nop*8*8*4*4)
-	d := Data{
-		Img: Image2Drgba32f{
-			Data:  imgg,
-			Width: int32(nop * 8),
-		},
-	}
-
-	ensureRun(t, 1, d, nop, nop, 1)
-
-	img := unsafeToFloat(imgg)
-	if img[0] != 1 ||
-		img[1] != 1 || img[2] != 1 || img[3] != 1 || img[4] != 0 || img[5] != 0 || img[6] != 0 || img[7] != 1 {
-		t.Log(img[0], img[1], img[2], img[3], img[4], img[5], img[6], img[7], img[8], img[9], img[10], img[11])
-		t.Error("output not as expected")
-	}
-}
-
-func unsafeToFloat(raw []byte) []float32 {
-	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
-	header.Len /= 4
-	header.Cap /= 4
-	data := *(*[]float32)(unsafe.Pointer(&header))
-	return data
+	ensureRun(t, 1, nop, nop, 1, func() Data {
+		return Data{
+			Img: Image2Drgba32f{
+				Data:  make([]float32, nop*nop*8*8*4),
+				Width: int32(nop * 8),
+			},
+		}
+	}, func(res Data) {
+		img := res.Img.Data
+		if img[0] != 1 ||
+			img[1] != 1 || img[2] != 1 || img[3] != 1 || img[4] != 0 || img[5] != 0 || img[6] != 0 || img[7] != 1 {
+			t.Log(img[0], img[1], img[2], img[3], img[4], img[5], img[6], img[7], img[8], img[9], img[10], img[11])
+			t.Error("output not as expected")
+		}
+	})
 }

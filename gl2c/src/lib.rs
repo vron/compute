@@ -48,6 +48,10 @@ impl fmt::Display for Argument {
 }
 */
 
+const ENV_DEFAULT:i32  = 0;
+const ENV_CASE:i32  = 1;
+const ENV_FOR:i32  = 2;
+
 pub struct State {
     body: Part,
     arguments: Vec<Argument>,
@@ -57,6 +61,8 @@ pub struct State {
 
     output: Output,
     last_output: Vec<Output>,
+
+    current_env: Vec<i32>,
 }
 
 pub struct Part {
@@ -153,6 +159,7 @@ pub fn visit_type_name(_s: &mut State, t: &syntax::TypeName) -> String {
 
 pub fn type_specifier_non_array(s: &mut State, t: &syntax::TypeSpecifierNonArray) -> String {
     let temp: String;
+    // TODO: should all these have a cptc_ prefix or such ? (also add to all methods?)
     String::from(match *t {
         syntax::TypeSpecifierNonArray::Void => "void",
         syntax::TypeSpecifierNonArray::Bool => "Bool",
@@ -278,19 +285,19 @@ pub fn type_specifier_non_array(s: &mut State, t: &syntax::TypeSpecifierNonArray
     })
 }
 
-pub fn visit_type_specifier(s: &mut State, t: &syntax::TypeSpecifier) -> (String, i32) {
+pub fn visit_type_specifier(s: &mut State, t: &syntax::TypeSpecifier) -> (String, Vec<i32>) { // TODO: arrno must be a vec, do on all places where i32!
     // Habndle the array types here!
     let ty = type_specifier_non_array(s, &t.ty);
     let _ = write!(s, "{}", ty);
 
     if let Some(ref arr_spec) = t.array_specifier {
-        let l = match visit_array_spec(s, arr_spec) {
-            Some(v) => v,
-            None => panic!("arrays with non - constant lengths not supported yet"),
-        };
-        return (ty, l);
+        let arrno = visit_array_spec(s, arr_spec);
+        if arrno.len() == 0 {
+            panic!("arrays with non - constant lengths not supported yet");
+        }
+        return (ty, arrno);
     }
-    (ty, 0)
+    (ty, vec!())
 }
 
 pub fn visit_fully_specified_type(s: &mut State, t: &syntax::FullySpecifiedType) {
@@ -336,17 +343,14 @@ pub fn visit_struct_field(s: &mut State, field: &syntax::StructFieldSpecifier) -
         let _ = write!(s, "{}", " ");
     }
 
-    let (tys, _) = visit_type_specifier(s, &field.ty);
+    let (tys, mut arrno1) = visit_type_specifier(s, &field.ty); // TOOD: could this not be an array of sizes?
     let _ = write!(s, "{}", " ");
 
     // there’s at least one identifier
     let mut identifiers = field.identifiers.0.iter();
     let identifier = identifiers.next().unwrap();
 
-    let arrno = match visit_arrayed_identifier(s, identifier) {
-        None => vec!(),
-        Some(v) => vec!(v),
-    };
+    let mut arrno = visit_arrayed_identifier(s, identifier, false);
 
     // write the rest of the identifiers
     for _identifier in identifiers {
@@ -354,6 +358,8 @@ pub fn visit_struct_field(s: &mut State, field: &syntax::StructFieldSpecifier) -
         //let _ = write!(s, "{}", ", ");
         //visit_arrayed_identifier(s, identifier);
     }
+
+    arrno.append(& mut arrno1);
 
     let _ = write!(s, "{}", ";\n");
     Argument {
@@ -363,28 +369,37 @@ pub fn visit_struct_field(s: &mut State, field: &syntax::StructFieldSpecifier) -
     }
 }
 
-pub fn visit_array_spec(s: &mut State, a: &syntax::ArraySpecifier) -> Option<i32> {
-    match *a {
-        syntax::ArraySpecifier::Unsized => {
-            let _ = write!(s, "{}", "[]");
-            return Some(-1);
-        }
-        syntax::ArraySpecifier::ExplicitlySized(ref e) => {
-            let _ = write!(s, "{}", "[");
-            let a = visit_expr(s, &e);
-            let _ = write!(s, "{}", "]");
-            a
+pub fn visit_array_spec(s: &mut State, a: &syntax::ArraySpecifier) -> Vec<i32> {
+    let mut vv: Vec<i32> = vec!();
+    let  v = &a.dimensions;
+    for dim in v.into_iter() {
+        match dim {
+            syntax::ArraySpecifierDimension::Unsized => {
+                let _ = write!(s, "{}", "[]");
+                vv.push(-1);
+            }
+            syntax::ArraySpecifierDimension::ExplicitlySized(ref e) => {
+                let _ = write!(s, "{}", "[");
+                let mut a = visit_expr(s, &e);
+                let _ = write!(s, "{}", "]");
+                vv.append(&mut a);
+            }
         }
     }
+    vv
 }
 
-pub fn visit_arrayed_identifier(s: &mut State, a: &syntax::ArrayedIdentifier) -> Option<i32> {
-    let _ = write!(s, "{}", a.ident);
+pub fn visit_arrayed_identifier(s: &mut State, a: &syntax::ArrayedIdentifier, is_ref:bool) -> Vec<i32> {
+    if is_ref {
+        let _ = write!(s, " (& {})", a.ident);
+    } else {
+        let _ = write!(s, "{}", a.ident);
+    }
 
     if let Some(ref arr_spec) = a.array_spec {
         return visit_array_spec(s, arr_spec);
     }
-    None
+    vec!()
 }
 
 pub fn non_accepted_layout_spec(s: &mut State, q: &syntax::TypeQualifier) -> bool {
@@ -426,6 +441,29 @@ pub fn visit_type_qualifier(s: &mut State, q: &syntax::TypeQualifier) {
     }
 }
 
+pub fn visit_type_qualifier_func(s: &mut State, q: &syntax::TypeQualifier) -> bool {
+    let mut qualifiers = q.qualifiers.0.iter();
+    let first = qualifiers.next().unwrap();
+
+    let r = match first {
+        syntax::TypeQualifierSpec::Storage(ref ss) => vis_ref(s, &ss),
+        syntax::TypeQualifierSpec::Layout(_) => panic!("{}", "no in a func?"),
+        syntax::TypeQualifierSpec::Precision(_) => panic!("{}", "no in a func?"),
+        syntax::TypeQualifierSpec::Interpolation(_) => panic!("{}", "no in a func?"),
+        syntax::TypeQualifierSpec::Invariant => panic!("{}", "no in a func?"),
+        syntax::TypeQualifierSpec::Precise => panic!("{}", "no in a func?"),
+    };
+
+
+    for _qual_spec in qualifiers {
+        panic!("{}", "cannot have more then one in a func?");
+        //let _ = write!(s, "{}", " ");
+        //visit_type_qualifier_spec(s, qual_spec)
+    }
+
+    r
+}
+
 pub fn visit_type_qualifier_spec(s: &mut State, q: &syntax::TypeQualifierSpec) {
     match *q {
         syntax::TypeQualifierSpec::Storage(ref ss) => visit_storage_qualifier(s, &ss),
@@ -438,6 +476,15 @@ pub fn visit_type_qualifier_spec(s: &mut State, q: &syntax::TypeQualifierSpec) {
         syntax::TypeQualifierSpec::Precise => {
             let _ = write!(s, "{}", "precise");
         }
+    }
+}
+
+pub fn vis_ref(_s: &mut State, q: &syntax::StorageQualifier)  -> bool{
+    match *q {
+        syntax::StorageQualifier::InOut => true,
+        syntax::StorageQualifier::In => false,
+        syntax::StorageQualifier::Out => true,
+        _ => false,
     }
 }
 
@@ -548,11 +595,11 @@ pub fn maybe_handle_wg(state: &mut State, q: &syntax::TypeQualifier) -> Option<i
             syntax::LayoutQualifierSpec::Identifier(ref i, Some(ref e)) => {
                 let s = i.as_str();
                 if s == "local_size_x" {
-                    state.wg_size[0] = as_number(e);
+                    state.wg_size[0] = as_number(state, e);
                 } else if s == "local_size_y" {
-                    state.wg_size[1] = as_number(e);
+                    state.wg_size[1] = as_number(state, e);
                 } else if s == "local_size_z" {
-                    state.wg_size[2] = as_number(e);
+                    state.wg_size[2] = as_number(state, e);
                 } else {
                     return None; // was not a layout
                 }
@@ -597,6 +644,7 @@ pub fn maybe_handle_global_buffer(state: &mut State, l: &syntax::InitDeclaratorL
                     match sq {
                         syntax::StorageQualifier::Uniform => (),
                         syntax::StorageQualifier::Buffer => (),
+                        syntax::StorageQualifier::WriteOnly => (),
                         _ => return None // not a global input / output
                     }
                 },
@@ -651,8 +699,7 @@ pub fn maybe_handle_shared(state: &mut State, l: &syntax::InitDeclaratorList) ->
         return None;
     }
 
-    let mut typname = type_specifier_non_array(state, &d.ty.ty.ty);
-
+    let (mut typname, mut arrnot) = visit_type_specifier(state, &d.ty.ty);
     // if this has a tail we should not handle it
     for _decl in &l.tail {
         return None;
@@ -661,14 +708,10 @@ pub fn maybe_handle_shared(state: &mut State, l: &syntax::InitDeclaratorList) ->
     // if there is any array part add that
     let mut arrno = vec!();
     if let Some(a) = &l.head.array_specifier {
-        let len = visit_array_spec(state, &a);
-        match len {
-            Some(l) => {
-                arrno.push(l);
-            },
-            _ => {},
-        };
+        arrno = visit_array_spec(state, &a);
     }
+
+    arrno.append(&mut arrnot);
     if let Some(ref name) = d.name {    // Add this argument
         typname.push_str(&subtype[..]);
         state.add_shared(Argument{
@@ -683,14 +726,16 @@ pub fn maybe_handle_shared(state: &mut State, l: &syntax::InitDeclaratorList) ->
 
 }
 
-pub fn as_number(expr: &syntax::Expr) -> i32 {
+pub fn as_number(s: &mut State, expr: &syntax::Expr) -> i32 {
     // convert an expression to a number, including using constants, or
     // not
-    match expr {
-        syntax::Expr::IntConst(v) => *v,
-        syntax::Expr::UIntConst(v) => *v as i32,
-        _ => panic!("only hard coded numbers are supported for WG size (layout specifier)"),
+    s.push_output(Output::None);
+    let en = visit_expr(s, expr);
+    s.pop_output();
+    if en.len() == 0 {
+        panic!("did not manage to parse WG size constant (layout specifier)");
     }
+    *en.last().unwrap()
 }
 
 pub fn visit_layout_qualifier_spec(s: &mut State, l: &syntax::LayoutQualifierSpec) -> String {
@@ -755,16 +800,16 @@ pub fn visit_double(s: &mut State, x: f64) {
     }
 }
 
-pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Option<i32> {
+pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Vec<i32> {
     match *expr {
         syntax::Expr::Variable(ref i) => visit_identifier(s, &i),
         syntax::Expr::IntConst(ref x) => {
             let _ = write!(s, "((int32_t)({}))", x);
-            return Some(*x);
+            return vec!(*x);
         }
         syntax::Expr::UIntConst(ref x) => {
             let _ = write!(s, "((uint32_t)({}))", x);
-            return Some((*x) as i32);
+            return vec!((*x) as i32);
         }
         syntax::Expr::BoolConst(ref x) => {
             let _ = write!(s, "{}", x);
@@ -774,17 +819,45 @@ pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Option<i32> {
         syntax::Expr::Unary(ref op, ref e) => {
             visit_unary_op(s, &op);
             let _ = write!(s, "{}", "(");
-            visit_expr(s, &e);
+            let val = visit_expr(s, &e);
             let _ = write!(s, "{}", ")");
+            if val.len() <= 0 {
+                return vec!()
+            }
+            return match op {
+                syntax::UnaryOp::Inc => vec!(1+val.get(0).unwrap()),
+                syntax::UnaryOp::Dec =>  vec!(-1+val.get(0).unwrap()),
+                syntax::UnaryOp::Add =>  vec!(0+val.get(0).unwrap()),
+                syntax::UnaryOp::Minus => vec!(-val.get(0).unwrap()),
+                _ => vec!()
+            }
         }
         syntax::Expr::Binary(ref op, ref l, ref r) => {
             let _ = write!(s, "{}", "(");
-            visit_expr(s, &l);
+            let v1 = visit_expr(s, &l);
             let _ = write!(s, "{}", ")");
             visit_binary_op(s, &op);
             let _ = write!(s, "{}", "(");
-            visit_expr(s, &r);
+            let v2 = visit_expr(s, &r);
             let _ = write!(s, "{}", ")");
+            if v1.len() <= 0 || v2.len() <= 0 {
+                return vec!()
+            }
+            let v1 = v1.get(0).unwrap();
+            let v2 = v2.get(0).unwrap();
+            return match op {
+                syntax::BinaryOp::BitOr => vec!(v1 | v2),
+                syntax::BinaryOp::BitXor => vec!(v1 ^ v2),
+                syntax::BinaryOp::BitAnd => vec!(v1 & v2),
+                syntax::BinaryOp::LShift => vec!(v1 << v2),
+                syntax::BinaryOp::RShift => vec!(v1 >> v2),
+                syntax::BinaryOp::Add => vec!(v1 + v2),
+                syntax::BinaryOp::Sub => vec!(v1 - v2),
+                syntax::BinaryOp::Mult => vec!(v1 * v2),
+                syntax::BinaryOp::Div => vec!(v1 / v2),
+                syntax::BinaryOp::Mod => vec!(v1 % v2),
+                _ => vec!(),
+            }
         }
         syntax::Expr::Ternary(ref c, ref ss, ref e) => {
             visit_expr(s, &c);
@@ -801,8 +874,12 @@ pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Option<i32> {
             visit_expr(s, &e);
         }
         syntax::Expr::Bracket(ref e, ref a) => {
-            visit_expr(s, &e);
-            visit_array_spec(s, &a);
+            let mut v: Vec<i32> = vec!();
+            let mut aa = visit_expr(s, &e);
+            v.append(&mut aa);
+            let mut b = visit_array_spec(s, &a);
+            v.append(&mut b);
+            return v
         }
         syntax::Expr::FunCall(ref fun, ref args) => {
             // we treat function calls to vector constructors specially since
@@ -826,6 +903,11 @@ pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Option<i32> {
                         "mat3" => write!(s, "{}", "make_mat3"),
                         "mat4" => write!(s, "{}", "make_mat4"),
                         "barrier" => write!(s, "{}", "this->barrier"),
+                        "bool" => write!(s, "{}", "Bool"),
+                        "int" => write!(s, "{}", "int32_t"),
+                        "uint" => write!(s, "{}", "uint32_t"),
+                        "float" => write!(s, "{}", "float"),
+                        "double" => write!(s, "{}", "double"),
                         _ =>  write!(s, "{}", n.0),
                     };
                 },
@@ -894,7 +976,7 @@ pub fn visit_expr(s: &mut State, expr: &syntax::Expr) -> Option<i32> {
             visit_expr(s, &b);
         }
     }
-    return None;
+    return vec!();
 }
 
 pub fn visit_path(s: &mut State, path: &syntax::Path) {
@@ -1049,7 +1131,6 @@ pub fn visit_declaration(s: &mut State, d: &syntax::Declaration, global: bool) {
         syntax::Declaration::InitDeclaratorList(ref list) => {
             // Global struct goes here
             // So does buffer inputs that are not part of blos
-
             s.push_output(Output::None);
             match maybe_handle_global_buffer(s, &list) {
                 Some(..) => {
@@ -1142,36 +1223,67 @@ pub fn visit_function_parameter_declaration(
 ) {
     match *p {
         syntax::FunctionParameterDeclaration::Named(ref qual, ref fpd) => {
+            let mut is_ref = false;
             if let Some(ref q) = *qual {
-                visit_type_qualifier(s, q);
+                is_ref = visit_type_qualifier_func(s, q);
                 let _ = write!(s, "{}", " ");
             }
 
-            visit_function_parameter_declarator(s, fpd);
+            visit_function_parameter_declarator(s, fpd, is_ref);
         }
         syntax::FunctionParameterDeclaration::Unnamed(ref qual, ref ty) => {
+             // TODO: Do we need to add the references here to as above in functions?
             if let Some(ref q) = *qual {
-                visit_type_qualifier(s, q);
+                visit_type_qualifier_func(s, q);
                 let _ = write!(s, "{}", " ");
             }
-
             visit_type_specifier(s, ty);
         }
     }
 }
 
-pub fn visit_function_parameter_declarator(s: &mut State, p: &syntax::FunctionParameterDeclarator) {
+pub fn visit_function_parameter_declarator(s: &mut State, p: &syntax::FunctionParameterDeclarator, is_ref: bool) {
     visit_type_specifier(s, &p.ty);
     let _ = write!(s, "{}", " ");
-    visit_arrayed_identifier(s, &p.ident);
+    visit_arrayed_identifier(s, &p.ident, is_ref);
 }
 
 pub fn visit_init_declarator_list(s: &mut State, i: &syntax::InitDeclaratorList) {
     visit_single_declaration(s, &i.head);
-
+////XXX here, a list?
+//what about arrays on second, third etc? element
+//just replace the comma below with a semicolon and type again?
     for decl in &i.tail {
-        let _ = write!(s, "{}", ", ");
-        visit_single_declaration_no_type(s, decl);
+        let _ = write!(s, "{}", "; ");
+        visit_single_declaration(s, &syntax::SingleDeclaration{
+            ty: i.head.ty.clone(),
+            name: Some(decl.ident.ident.clone()),
+            array_specifier: decl.ident.array_spec.clone(),
+            initializer: i.head.initializer.clone(),
+        });
+/*
+        pub struct SingleDeclaration {
+            pub ty: FullySpecifiedType,
+            pub name: Option<Identifier>,
+            pub array_specifier: Option<ArraySpecifier>,
+            pub initializer: Option<Initializer>,
+          }
+          
+          pub struct ArrayedIdentifier {
+            pub ident: Identifier,
+            pub array_spec: Option<ArraySpecifier>,
+          }
+
+          /// A single declaration with implicit, already-defined type.
+          #[derive(Clone, Debug, PartialEq)]
+          pub struct SingleDeclarationNoType {
+            pub ident: ArrayedIdentifier,
+            pub initializer: Option<Initializer>,
+          }
+
+*/
+
+        //visit_single_declaration_no_type(s, decl);
     }
 }
 
@@ -1188,16 +1300,33 @@ pub fn visit_single_declaration(s: &mut State, d: &syntax::SingleDeclaration) {
     }
 
     if let Some(ref initializer) = d.initializer {
+        if *s.current_env.last().unwrap() != ENV_FOR {
+            let _ = write!(s, "{}", ";\n");
+
+            if let Some(ref name) = d.name {
+                visit_identifier(s, name);
+            }
+        } else {
+        }
         let _ = write!(s, "{}", " = ");
+
         visit_initializer(s, initializer);
     }
 }
 
 pub fn visit_single_declaration_no_type(s: &mut State, d: &syntax::SingleDeclarationNoType) {
-    visit_arrayed_identifier(s, &d.ident);
+    visit_arrayed_identifier(s, &d.ident, false);
 
     if let Some(ref initializer) = d.initializer {
+        if *s.current_env.last().unwrap() != ENV_FOR {
+            let _ = write!(s, "{}", ";\n");
+
+            let name =  &d.ident.ident;
+                visit_identifier(s, name);
+        } else {
+        }
         let _ = write!(s, "{}", " = ");
+
         visit_initializer(s, initializer);
     }
 }
@@ -1244,7 +1373,7 @@ pub fn visit_block(s: &mut State, b: &syntax::Block) {
     //let _ = write!(s, "{}", "}");
 
     if let Some(ref ident) = b.identifier {
-        visit_arrayed_identifier(s, ident);
+        visit_arrayed_identifier(s, ident, false);
     }
     s.pop_output();
 }
@@ -1256,6 +1385,8 @@ pub fn visit_function_definition(s: &mut State, fd: &syntax::FunctionDefinition)
 }
 
 pub fn visit_compound_statement(s: &mut State, cst: &syntax::CompoundStatement) {
+    s.current_env.push(ENV_DEFAULT);
+
     let _ = write!(s, "{}", "{\n");
 
     for st in &cst.statement_list {
@@ -1263,6 +1394,7 @@ pub fn visit_compound_statement(s: &mut State, cst: &syntax::CompoundStatement) 
     }
 
     let _ = write!(s, "{}", "}\n");
+    s.current_env.pop();
 }
 
 pub fn visit_statement(s: &mut State, st: &syntax::Statement) {
@@ -1326,6 +1458,7 @@ pub fn visit_switch_statement(s: &mut State, sst: &syntax::SwitchStatement) {
 }
 
 pub fn visit_case_label(s: &mut State, cl: &syntax::CaseLabel) {
+    s.current_env.push(ENV_CASE);
     match *cl {
         syntax::CaseLabel::Case(ref e) => {
             let _ = write!(s, "{}", "case ");
@@ -1339,6 +1472,7 @@ pub fn visit_case_label(s: &mut State, cl: &syntax::CaseLabel) {
 }
 
 pub fn visit_iteration_statement(s: &mut State, ist: &syntax::IterationStatement) {
+    s.current_env.push(ENV_DEFAULT);
     match *ist {
         syntax::IterationStatement::While(ref cond, ref body) => {
             let _ = write!(s, "{}", "while (");
@@ -1351,12 +1485,14 @@ pub fn visit_iteration_statement(s: &mut State, ist: &syntax::IterationStatement
             visit_statement(s, body);
             let _ = write!(s, "{}", " while (");
             visit_expr(s, cond);
-            let _ = write!(s, "{}", ")\n");
+            let _ = write!(s, "{}", ");\n");
         }
         syntax::IterationStatement::For(ref init, ref rest, ref body) => {
             let _ = write!(s, "{}", "for (");
+            s.current_env.push(ENV_FOR);
             visit_for_init_statement(s, init);
             visit_for_rest_statement(s, rest);
+            s.current_env.pop();
             let _ = write!(s, "{}", ") ");
             visit_statement(s, body);
         }
@@ -1560,6 +1696,7 @@ pub fn translate(file: String) -> String {
         output: Output::Body,
         last_output: Vec::new(),
         wg_size: [0, 1, 1],
+        current_env: vec!(ENV_DEFAULT),
     };
 
     visit_translation_unit(&mut state, &tu);

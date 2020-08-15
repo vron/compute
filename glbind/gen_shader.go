@@ -7,9 +7,15 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/vron/compute/glbind/input"
+	"github.com/vron/compute/glbind/types"
 )
 
-func generateComp(inp Input) {
+const CPTC = ""
+
+func generateShader(inp input.Input, ts *types.Types) {
 	f, err := os.Create(filepath.Join(fOut, "generated/shader.hpp"))
 	if err != nil {
 		log.Fatalln(err)
@@ -23,115 +29,142 @@ func generateComp(inp Input) {
 #define _cpt_WG_SIZE_X %v
 #define _cpt_WG_SIZE_Y %v
 #define _cpt_WG_SIZE_Z %v
+#define _cpt_WG_SIZE %v
 
 #include <cmath>
 #include "../types/types.hpp"
 #include "usertypes.hpp"
-#include "../routines/routines.hpp"
+#include "../co/routines.hpp"
 
-`, inp.Wg_size[0], inp.Wg_size[1], inp.Wg_size[2])
+`, inp.Wg_size[0], inp.Wg_size[1], inp.Wg_size[2], inp.Wg_size[0]*inp.Wg_size[1]*inp.Wg_size[2])
 
-	writeSharedStruct(buf, inp)
+	fmt.Fprintf(buf, `
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-value"
+#pragma clang diagnostic ignored "-Wsign-compare"
 
-	buf.WriteString("struct shader {\n")
-	buf.WriteString("\tuvec3 gl_NumWorkGroups;\n")
-	buf.WriteString("\tuvec3 gl_WorkGroupSize;\n")
-	buf.WriteString("\tuvec3 gl_WorkGroupID;\n")
-	buf.WriteString("\tuvec3 gl_LocalInvocationID;\n")
-	buf.WriteString("\tuvec3 gl_GlobalInvocationID;\n")
-	buf.WriteString("\tuint32_t gl_LocalInvocationIndex;\n")
-	buf.WriteString("\tInvocation<struct shader*>  *invocation;\n\n")
+`)
+
+	// ugly hac to manage array initialization of the shaders
+	fmt.Fprintf(buf, "#define _cpt_REPEAT_WG_SIZE(x) x")
+	for i := 1; i < inp.Wg_size[0]*inp.Wg_size[1]*inp.Wg_size[2]; i++ {
+		fmt.Fprintf(buf, ", x")
+	}
+	fmt.Fprintf(buf, "\n")
+
+	writeSharedStruct(buf, inp, ts)
+
+	fmt.Fprintf(buf, "struct shader {\n")
+	fmt.Fprintf(buf, "  uvec3 gl_NumWorkGroups;\n")
+	fmt.Fprintf(buf, "  uvec3 gl_WorkGroupSize;\n")
+	fmt.Fprintf(buf, "  uvec3 gl_WorkGroupID;\n")
+	fmt.Fprintf(buf, "  uvec3 gl_LocalInvocationID;\n")
+	fmt.Fprintf(buf, "  uvec3 gl_GlobalInvocationID;\n")
+	fmt.Fprintf(buf, "  uint32_t gl_LocalInvocationIndex;\n")
+	fmt.Fprintf(buf, "  co::Routine<struct shader*>  *invocation;\n\n")
 
 	// write all the globals we should be able to access
 	for _, arg := range inp.Arguments {
-		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, arg.Arrno)}
-		fmt.Fprintf(buf, cf.CxxFieldString()+"\n")
+		t := ts.Get(arg.Ty)
+		cf := types.CField{Name: arg.Name, CType: types.CreateArray(t.C, arg.Arrno)}
+		fmt.Fprintf(buf, "  "+refify(cf.CType.CString(CPTC, cf.Name, false))+";\n")
 	}
+	fmt.Fprintf(buf, "\n")
 
 	// also write all the shared variabels we should be able to access
 	for _, arg := range inp.Shared {
-		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, []int{-1})} // TODO: chec this, we always do array here to use pointer
-		fmt.Fprintf(buf, cf.CxxFieldString()+"\n")
+		t := ts.Get(arg.Ty)
+		cf := types.CField{Name: arg.Name, CType: types.CreateArray(t.C, arg.Arrno)}
+		fmt.Fprintf(buf, "  "+refify(cf.CType.CString(CPTC, cf.Name, false))+";\n")
 	}
 
-	buf.WriteString("\n")
-	buf.WriteString("\tshader() {};\n")
-	buf.WriteString("\n")
+	writeConstructors(buf, inp, ts)
 
-	buf.WriteString(inp.Body)
-	buf.WriteString("\n")
-	buf.WriteString("\n")
-	buf.WriteString(`
-	void set_data(cpt_data d) {
-	auto me = this;
-`)
-	generateSetData(buf, inp)
-	buf.WriteString(`
-	}
-`)
-	buf.WriteString(`
+	fmt.Fprint(buf, inp.Body)
+	fmt.Fprintf(buf, "\n")
+	fmt.Fprintf(buf, "\n")
+	fmt.Fprintf(buf, `
 	void barrier();
 `)
 
-	// Generate a function for allocating and de-allocating shared data, and one for binding it to
-	// a class instance.
-	// TODO: handle allocation errors...
-	buf.WriteString(`
-	static shared_data_t* create_shared_data() {
-		shared_data_t *sd = new shared_data_t();
-		`)
-	// allocate each of the shared buffers we need
-	for _, arg := range inp.Shared {
-		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, arg.Arrno)}
-		fmt.Fprintf(buf, "sd->%v = (%v*)malloc(%v*sizeof(%v));\n", arg.Name, cf.Ty.ty.Name, cf.Ty.ArrayLen, cf.Ty.ty.Name)
-	}
-	buf.WriteString(`
-		return sd;
-	}
-
-	static void free_shared_data(shared_data_t *sd) {
-		`)
-	for _, arg := range inp.Shared {
-		fmt.Fprintf(buf, "free(sd->%v);\n", arg.Name)
-	}
-	buf.WriteString(`
-		delete sd;
-	}
-
-	void set_shared_data(shared_data_t *sd) {
-		(void)sd;
-		`)
-
-	for _, arg := range inp.Shared {
-		fmt.Fprintf(buf, "this->%v = sd->%v;\n", arg.Name, arg.Name)
-	}
-	buf.WriteString(`
-	}
+	fmt.Fprintf(buf, `
 };
+`)
+	fmt.Fprintf(buf, `
+#pragma clang diagnostic pop
 `)
 }
 
-func writeSharedStruct(buf io.Writer, inp Input) {
+func writeSharedStruct(buf io.Writer, inp input.Input, ts *types.Types) {
 	fmt.Fprintf(buf, "class  shared_data_t {\npublic:\n")
 	for _, arg := range inp.Shared {
-		cf := CField{Name: arg.Name, Ty: maybeCreateArrayType(arg.Ty, []int{-1})}
-		fmt.Fprintf(buf, cf.CxxFieldString()+"\n")
+		t := ts.Get(arg.Ty)
+		cf := types.CField{Name: arg.Name, CType: types.CreateArray(t.C, arg.Arrno)}
+		fmt.Fprintf(buf, "  "+cf.CType.CString(CPTC, cf.Name, false)+";\n")
 	}
 	fmt.Fprintf(buf, "} ;\n\n")
 }
 
-func generateSetData(buf *bufio.Writer, inp Input) {
-	// we have an variable d of the data struct type that we need
-	// to translate to the member variables.
+func writeConstructors(buf io.Writer, inp input.Input, ts *types.Types) {
 
-	for _, a := range inp.Arguments {
-		cf := CField{
-			Name: a.Name,
-			Ty:   maybeCreateArrayType(a.Ty, a.Arrno),
+	fmt.Fprintf(buf, "  shader(cptc_data *d, shared_data_t *sd) ")
+	if len(inp.Shared)+len(inp.Arguments) > 0 {
+		fmt.Fprintf(buf, ":\n")
+		for i, arg := range inp.Arguments {
+			ty := types.CreateArray(ts.Get(arg.Ty).C, arg.Arrno)
+			deref := "*"
+			if (len(arg.Arrno) > 0 && arg.Arrno[0] == -1) || ty.IsComplexStruct() {
+				deref = ""
+			}
+			fmt.Fprintf(buf, "        %v(%v(d->%v))", arg.Name, deref, arg.Name)
+			if i != len(inp.Arguments)-1 || len(inp.Shared) != 0 {
+				fmt.Fprintf(buf, ",\n")
+			}
 		}
-		//recChecAlignment(buf, inp, cf, "d.")
-		cf.CxxBinding(buf)
+		for i, arg := range inp.Shared {
+			fmt.Fprintf(buf, "        %v(sd->%v)", arg.Name, arg.Name)
+			if i != len(inp.Shared)-1 {
+				fmt.Fprintf(buf, ",\n")
+			}
+		}
+	}
+	fmt.Fprintf(buf, "{};\n")
+
+	// copy constructor is used for array initialization
+	fmt.Fprintf(buf, "\n")
+	fmt.Fprintf(buf, "\tshader(const shader& org) ")
+	if len(inp.Shared)+len(inp.Arguments) > 0 {
+		fmt.Fprintf(buf, ":\n")
+		for i, arg := range inp.Arguments {
+			fmt.Fprintf(buf, "       %v(org.%v)", arg.Name, arg.Name)
+			if i != len(inp.Arguments)-1 || len(inp.Shared) != 0 {
+				fmt.Fprintf(buf, ",\n")
+			}
+		}
+		for i, arg := range inp.Shared {
+			fmt.Fprintf(buf, "        %v(org.%v)", arg.Name, arg.Name)
+			if i != len(inp.Shared)-1 {
+				fmt.Fprintf(buf, ",\n")
+			}
+		}
 	}
 
-	buf.WriteString("\treturn;")
+	fmt.Fprintf(buf, "{};\n\n")
+}
+
+func refify(s string) string {
+	// hac*y but wor*s
+	sp := strings.SplitN(s, "\t", 2)
+	tp, nm := sp[0], sp[1]
+	if strings.HasPrefix(strings.TrimSpace(nm), "(*") {
+		return s // pointer, no need to add reference
+	}
+	if !strings.Contains(nm, "[") {
+		return tp + "&" + "\t" + nm
+	}
+	// so this is an array type, need to add it innermost (ref spirlal rule)
+	sp = strings.SplitN(nm, "[", 2)
+	return tp + "\t" + "(&" + strings.TrimSpace(sp[0]) + ")[" + sp[1]
 }

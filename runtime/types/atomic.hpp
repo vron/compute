@@ -1,6 +1,20 @@
 #pragma once
 #include "common.hpp"
+#include <atomic>
 #include <cstdint>
+
+/* barrier */
+void always_inline memoryBarrier() {
+  std::atomic_thread_fence(std::memory_order_seq_cst);
+}
+
+void always_inline memoryBarrierBuffer() { memoryBarrier(); }
+
+void always_inline memoryBarrierImage() { memoryBarrier(); }
+
+void always_inline memoryBarrierShared() { memoryBarrier(); }
+
+/* atomic operations */
 
 uint32_t always_inline atomicAdd(uint32_t *mem, uint32_t data) {
   return __atomic_add_fetch(mem, data, __ATOMIC_SEQ_CST);

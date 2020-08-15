@@ -7,11 +7,9 @@ package kernel
 */
 import (
 	"math"
-	"reflect"
 	"runtime"
 	"sync"
 	"testing"
-	"unsafe"
 )
 
 var shader = `
@@ -116,7 +114,7 @@ func BenchmarkTransTri(b *testing.B) {
 	noi := 128
 	data := d(noi)
 
-	k, err := New(runtime.GOMAXPROCS(-1))
+	k, err := New(runtime.GOMAXPROCS(-1), 1024*1024)
 	if err != nil {
 		b.Error(err)
 		b.FailNow()
@@ -133,9 +131,8 @@ func BenchmarkTransTri(b *testing.B) {
 	b.StopTimer()
 
 	// chec the cog's
-	cogs := unsafeToFloat(data.Cogs)
 	for i := 0; i < noi; i++ {
-		cog := [2]float32{cogs[i*2], cogs[i*2+1]}
+		cog := data.Cogs[i]
 		if math.Abs(float64(cog[0]-1)) > 1e-4 || math.Abs(float64(cog[1]-1)) > 1e-4 {
 			b.Error("bas cog data", i, cog)
 		}
@@ -144,37 +141,26 @@ func BenchmarkTransTri(b *testing.B) {
 
 func TestTransTri(t *testing.T) {
 	noi := 2
-	data := d(noi)
-	ensureRun(t, 1, data, noi, 1, 1)
-
-	// chec the cog's
-	cogs := unsafeToFloat(data.Cogs)
-	for i := 0; i < noi; i++ {
-		cog := [2]float32{cogs[i*2], cogs[i*2+1]}
-		if math.Abs(float64(cog[0]-1)) > 1e-4 || math.Abs(float64(cog[1]-1)) > 1e-4 {
-			t.Error("bas cog data", i, cog)
+	ensureRun(t, 1, noi, 1, 1, func() Data { return d(noi) }, func(res Data) {
+		// chec the cog's
+		for i := 0; i < noi; i++ {
+			cog := res.Cogs[i]
+			if math.Abs(float64(cog[0]-1)) > 1e-4 || math.Abs(float64(cog[1]-1)) > 1e-4 {
+				t.Error("bas cog data", i, cog)
+			}
 		}
-	}
-}
-
-func floatToByte(raw []float32) []byte {
-	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
-	header.Len *= 4
-	header.Cap *= 4
-	data := *(*[]byte)(unsafe.Pointer(&header))
-	return data
+	})
 }
 
 func d(noi int) Data {
 	d := Data{
-		Transform: [9]float32{1, 0, 0, 0, 1, 0, 2.0 / 3, 2.0 / 3, 1},
-		Polygons:  make([]byte, noi*64*Polygon{}.Stride()),
-		Cogs:      make([]byte, noi*4*2), // vec2 for each cog
+		Transform: &Mat3{Vec3{1, 0, 0}, Vec3{0, 1, 0}, Vec3{2.0 / 3, 2.0 / 3, 1}},
+		Polygons:  make([]Polygon, noi*64),
+		Cogs:      make([]Vec2, noi),
 	}
 	// fill with polygons
 	for i := 0; i < noi*64; i++ {
-		tp := p()
-		(&tp).Encode(d.Polygons[tp.Stride()*i:])
+		d.Polygons[i] = p()
 	}
 	return d
 }
@@ -200,16 +186,8 @@ func p() Polygon {
 func t() Triangle {
 	// area 0.5 and COG at (1/3, 1/3)
 	return Triangle{
-		Vertices: [6]float32{0, 0, 0, 1, 1, 0},
+		Vertices: [3]Vec2{{0, 0}, {0, 1}, {1, 0}},
 	}
-}
-
-func unsafeToFloat(raw []byte) []float32 {
-	header := *(*reflect.SliceHeader)(unsafe.Pointer(&raw))
-	header.Len /= 4
-	header.Cap /= 4
-	data := *(*[]float32)(unsafe.Pointer(&header))
-	return data
 }
 
 func BenchmarkTransTriRef(b *testing.B) {
@@ -268,7 +246,7 @@ func impl(tr [9]float32, ps []Polygon, cogs []float32) {
 }
 
 func area_tri(t Triangle) float32 {
-	a := (t.Vertices[2]-t.Vertices[0])*(t.Vertices[5]-t.Vertices[1]) - (t.Vertices[4]-t.Vertices[0])*(t.Vertices[3]-t.Vertices[1])
+	a := (t.Vertices[1][0]-t.Vertices[0][0])*(t.Vertices[2][1]-t.Vertices[0][1]) - (t.Vertices[2][0]-t.Vertices[0][0])*(t.Vertices[1][1]-t.Vertices[0][1])
 	if a < 0.0 {
 		a *= -0.5
 	} else {
@@ -278,13 +256,13 @@ func area_tri(t Triangle) float32 {
 }
 
 func cog_tri(t Triangle) (float32, float32) {
-	return (t.Vertices[2] + t.Vertices[4] + t.Vertices[0]) / 3.0,
-		(t.Vertices[3] + t.Vertices[5] + t.Vertices[1]) / 3.0
+	return (t.Vertices[1][0] + t.Vertices[2][0] + t.Vertices[0][0]) / 3.0,
+		(t.Vertices[1][1] + t.Vertices[2][1] + t.Vertices[0][1]) / 3.0
 }
 
 func tri(t *Triangle, transform [9]float32) (area, x, y float32) {
 	for i := 0; i < 3; i++ {
-		t.Vertices[i*2], t.Vertices[i*2+1], _ = matmul(transform, t.Vertices[i*2], t.Vertices[i*2+1], 1.0)
+		t.Vertices[i][0], t.Vertices[i][1], _ = matmul(transform, t.Vertices[i][0], t.Vertices[i][1], 1.0)
 	}
 	area = area_tri(*t)
 	x, y = cog_tri(*t)

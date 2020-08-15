@@ -3,6 +3,7 @@
 #define _cpt_WG_SIZE_X 64
 #define _cpt_WG_SIZE_Y 1
 #define _cpt_WG_SIZE_Z 1
+#define _cpt_WG_SIZE (_cpt_WG_SIZE_Z * _cpt_WG_SIZE_Y * _cpt_WG_SIZE_X)
 
 #include <cmath>
 #include "../types/types.hpp"
