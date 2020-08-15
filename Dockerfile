@@ -1,8 +1,8 @@
 FROM ubuntu:focal
 RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get update && \
-    apt-get install -y build-essential glslang-tools clang golang-go cargo rustc git && \
-    go get golang.org/x/tools/cmd/goimports && cp /root/go/bin/goimports /bin/ && \
+    apt-get install -y build-essential glslang-tools clang golang-go cargo rustc git
+RUN go get golang.org/x/tools/cmd/goimports && cp /root/go/bin/goimports /bin/ && \
     mkdir /data
 
 RUN export DEBIAN_FRONTEND=noninteractive && \
@@ -27,4 +27,3 @@ COPY script script
 VOLUME [ "/build" ]
 
 ENTRYPOINT ["/script/docker.sh"]
-#ENTRYPOINT ["/bin/bash"]

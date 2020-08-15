@@ -3,7 +3,9 @@
 
 set -e
 name=${1%.comp}
+echo $1
 echo "doing package $name"
+ls -lah /data
 go run script/build.go /data/$1
 echo "done b"
 cp -r /build/go/* /data/

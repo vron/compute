@@ -39,18 +39,27 @@ func main() {
 	ts := filepath.Base(SHADER)
 	path := filepath.Dir(SHADER)
 	ts = filepath.Join("build", ts+".inc.comp")
+	println("run lua")
 	ensure(run("lua", "script/lcpp.lua", SHADER, "-I"+path, "-o", ts))
 	SHADER = ts
 
+	println("lua run")
+
 	ensure(run("glslangValidator", SHADER))
 
+	println("a")
 	ensure(runf("gl2c", "cargo", "run", "-q", "--", "../"+SHADER, "../build/kernel.json"))
+
+	println("b")
 
 	files, _ := filepath.Glob("glbind/*.go")
 	ensure(run("go", append([]string{"run"}, files...)...))
 
+	println("c")
 	ensure(run("goimports", "-w", "build/kernel.go"))
+	println("d")
 	ensure(run("goimports", "-w", "build/types.go"))
+	println("e")
 
 	// TODO: here we want to build for multiple platforms...
 	cargs := []string{
@@ -80,6 +89,7 @@ func main() {
 		outf = "./shader.so"
 		cargs = append(cargs, "-fPIC")
 	}
+	println("run c")
 	ensure(runf("build", CLANGPP, append([]string{"lib.cpp", asm, "-shared", "-o", outf}, cargs...)...))
 
 	ensure(os.MkdirAll("build/go/build", 0777))
