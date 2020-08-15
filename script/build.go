@@ -50,6 +50,7 @@ func main() {
 	ensure(run("go", append([]string{"run"}, files...)...))
 
 	ensure(run("goimports", "-w", "build/kernel.go"))
+	ensure(run("goimports", "-w", "build/types.go"))
 
 	// TODO: here we want to build for multiple platforms...
 	cargs := []string{
@@ -90,6 +91,7 @@ func main() {
 		cp("build/util_test.go", "build/go/util_test.go")
 	}
 	cp("build/kernel.go", "build/go/kernel.go")
+	cp("build/types.go", "build/go/types.go")
 
 	if runtime.GOOS == "windows" {
 		cp("build/shader.dll", "build/go/shader.dll")

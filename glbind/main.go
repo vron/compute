@@ -39,6 +39,7 @@ func main() {
 	generateShader(inp, ts)
 	generateAlign(inp, ts)
 	generateGo(inp, ts)
+	generateGoTypes(inp, ts)
 }
 
 func expect(err error) {
