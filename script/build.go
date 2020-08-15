@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -100,7 +101,13 @@ func main() {
 		cp("build/shader.so", "build/go/build/shader.so")
 	}
 	cp("build/generated/shared.h", "build/go/shared.h")
-	ensure(runf("build/go", "go", "test", "-v", "."))
+
+	files, _ = filepath.Glob("build/go/*.go")
+	for i := range files {
+		files[i] = filepath.Base(files[i])
+	}
+	fmt.Println(files)
+	ensure(runf("build/go", "go", append([]string{"test", "-v"}, files...)...))
 }
 
 func run(m string, args ...string) error {

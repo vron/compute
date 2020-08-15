@@ -28,8 +28,23 @@ func generateGo(inp input.Input, ts *types.Types) {
 
 	writePreamble(buf, inp, ts)
 
-	fmt.Fprintf(buf, `
+	fmt.Fprint(buf, `
 // Code generated DO NOT EDIT
+
+// AlignedSlice returns a byte slice where the first element has a minimum
+// alignment of align and a length if size.
+func AlignedSlice(size, align int) (b []byte) {
+	if align < 1 {
+		panic("align must be > 0")
+	}
+	b = make([]byte, size+align-1)
+	adr := uintptr(unsafe.Pointer(&b[0]))
+	diff := 0
+	if int(adr) % align != 0 {
+		diff = align - int(adr) % align
+	}
+	return b[diff:diff+size]
+}
 
 type Kernel struct {
 	k unsafe.Pointer
